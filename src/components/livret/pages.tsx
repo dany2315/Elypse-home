@@ -149,7 +149,18 @@ export function ArrivalPage() {
               ))}
             </div>
           )}
-          {l.videoUrl && (
+          {l.videoUrl && /^\/api\/images\/|\.(mp4|mov|webm)(\?|$)/i.test(l.videoUrl) ? (
+            <div className="space-y-2">
+              <video
+                src={l.videoUrl}
+                controls
+                playsInline
+                preload="metadata"
+                className="max-h-[75svh] w-full rounded-[1.4rem] bg-night"
+              />
+              <p className="text-center text-xs text-stone">{tr("videoCaption")}</p>
+            </div>
+          ) : l.videoUrl && (
             <a
               href={l.videoUrl}
               target="_blank"

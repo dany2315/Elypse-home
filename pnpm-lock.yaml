@@ -90,6 +90,9 @@ importers:
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
+      domhandler:
+        specifier: 5.0.3
+        version: 5.0.3
       dotenv:
         specifier: ^18.0.6
         version: 18.0.6

@@ -31,4 +31,4 @@ Les photos sont compressées en WebP dans le navigateur (≈ 200 Ko), stockées 
 
 ## Déploiement (Vercel)
 
-Renseigner les variables de `.env.example` dans le projet Vercel (avec `BETTER_AUTH_URL` = l'URL de production), puis déployer.
+Variables à renseigner dans Vercel : `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`. Les URLs Vercel (production et previews) sont reconnues automatiquement ; `BETTER_AUTH_URL` ne sert que pour un domaine personnalisé (ex. `https://livret.mondomaine.com`).

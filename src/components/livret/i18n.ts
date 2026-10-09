@@ -46,6 +46,10 @@ const dict = {
   },
   facade: { fr: "Vous êtes au bon endroit", en: "You're in the right place" },
   video: { fr: "Voir la vidéo du trajet", en: "Watch the route video" },
+  videoCaption: {
+    fr: "Le trajet en vidéo, du repère le plus proche jusqu'à votre porte.",
+    en: "The route on video, from the nearest landmark to your door.",
+  },
 
   network: { fr: "Réseau", en: "Network" },
   password: { fr: "Mot de passe", en: "Password" },

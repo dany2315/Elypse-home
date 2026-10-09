@@ -44,6 +44,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "cheerio": "^1.2.0",
+    "domhandler": "5.0.3",
     "dotenv": "^18.0.6",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
