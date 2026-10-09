@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { cleanupImages } from "@/lib/image-cleanup";
 import { generateLivretToken } from "@/lib/token";
 
 /* --------------------------------- Schémas -------------------------------- */
@@ -126,13 +127,31 @@ function delegate(kind: ItemKind) {
   };
 }
 
+/** Photo actuelle d'une recommandation ou d'un équipement (les transports et contacts n'en ont pas). */
+async function itemImageId(kind: ItemKind, id: string) {
+  if (kind === "recommendation") {
+    return (await prisma.recommendation.findUnique({ where: { id }, select: { imageId: true } }))?.imageId ?? null;
+  }
+  if (kind === "equipment") {
+    return (await prisma.equipment.findUnique({ where: { id }, select: { imageId: true } }))?.imageId ?? null;
+  }
+  return null;
+}
+
 /* --------------------------------- Livrets -------------------------------- */
 
 export async function updateLivret(id: string, input: LivretInput): Promise<Result> {
   try {
     await requireSession();
     const data = livretSchema.parse(input);
+    const before = await prisma.livret.findUniqueOrThrow({
+      where: { id },
+      select: { coverImageId: true, facadeImageIds: true },
+    });
     await prisma.livret.update({ where: { id }, data });
+    // Photos remplacées ou retirées : supprimées seulement maintenant que l'enregistrement est fait.
+    const kept = new Set([data.coverImageId, ...data.facadeImageIds]);
+    await cleanupImages([before.coverImageId, ...before.facadeImageIds].filter((img) => !kept.has(img)));
     refresh(id);
     return { ok: true };
   } catch (e) {
@@ -191,7 +210,9 @@ export async function saveItem<K extends ItemKind>(
     const model = delegate(kind);
     let id = itemId;
     if (id) {
+      const previousImage = await itemImageId(kind, id);
       await model.update({ where: { id }, data });
+      if (previousImage && previousImage !== data.imageId) await cleanupImages([previousImage]);
     } else {
       const last = await model.aggregate({ where: { livretId }, _max: { sortOrder: true } });
       ({ id } = await model.create({
@@ -208,7 +229,9 @@ export async function saveItem<K extends ItemKind>(
 export async function deleteItem(kind: ItemKind, itemId: string): Promise<Result> {
   try {
     await requireSession();
+    const previousImage = await itemImageId(kind, itemId);
     const { livretId } = await delegate(kind).delete({ where: { id: itemId } });
+    await cleanupImages([previousImage]);
     refresh(livretId);
     return { ok: true };
   } catch (e) {
