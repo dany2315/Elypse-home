@@ -157,6 +157,17 @@ function Home({ lang, onLang, onOpen }: { lang: Lang; onLang: (l: Lang) => void;
   const { data: weather } = useWeather(l.city, l.latitude, l.longitude);
   const cover = imageUrl(l.coverImageId);
 
+  // La barre passe en « ivoire » quand le bas de la photo sort de l'écran.
+  const sentinel = useRef<HTMLDivElement>(null);
+  const [solid, setSolid] = useState(false);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setSolid(!entry.isIntersecting && entry.boundingClientRect.top < 0));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   const has = {
     equipements: data.equipments.length > 0 || Boolean(loc(l.essentials)),
     regles: Boolean(loc(l.rules)),
@@ -170,6 +181,74 @@ function Home({ lang, onLang, onOpen }: { lang: Lang; onLang: (l: Lang) => void;
 
   return (
     <div className="pb-safe">
+      {/* Barre fixe : logo, météo, langue */}
+      <div
+        className={cn(
+          "fixed inset-x-0 top-0 z-20 mx-auto max-w-[480px] transition-[background-color,box-shadow,backdrop-filter] duration-500",
+          solid
+            ? "bg-ivory/80 shadow-[0_12px_30px_-24px_rgba(18,22,42,.45)] backdrop-blur-xl backdrop-saturate-150"
+            : "bg-gradient-to-b from-night/45 to-transparent",
+        )}
+      >
+        <div className="flex items-center gap-3 px-5 pt-[max(.9rem,env(safe-area-inset-top))] pb-3">
+          <Image
+            src="/brand/monogram.png"
+            alt="Elypse Home"
+            width={513}
+            height={638}
+            priority
+            className={cn("h-auto shrink-0 transition-all duration-500", solid ? "w-7" : "w-9 drop-shadow-lg")}
+          />
+          <p
+            className={cn(
+              "min-w-0 flex-1 truncate font-serif text-[1.05rem] text-ink transition-all duration-500",
+              solid ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-1 opacity-0",
+            )}
+          >
+            {l.title}
+          </p>
+          <div className="flex shrink-0 items-center gap-2">
+            {weather && (
+              <button
+                type="button"
+                onClick={() => onOpen("meteo")}
+                className={cn(
+                  "flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm font-semibold backdrop-blur-md transition-colors duration-500",
+                  solid ? "border-[#e3d9c6] bg-white/70 text-ink" : "border-white/15 bg-night/30 text-ivory",
+                )}
+              >
+                <span>{weatherIcon(weather.current.code)}</span>
+                {weather.current.temp}°
+              </button>
+            )}
+            <div
+              className={cn(
+                "flex h-9 rounded-full border p-0.5 backdrop-blur-md transition-colors duration-500",
+                solid ? "border-[#e3d9c6] bg-white/70" : "border-white/15 bg-night/30",
+              )}
+              role="group"
+              aria-label="Langue"
+            >
+              {(["fr", "en"] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => onLang(code)}
+                  aria-pressed={lang === code}
+                  className={cn(
+                    "rounded-full px-3 text-[11px] font-bold tracking-[0.12em] uppercase transition",
+                    lang === code ? "bg-gold-foil text-night" : solid ? "text-ink/60" : "text-ivory/70",
+                  )}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className={cn("gold-hairline h-px transition-opacity duration-500", solid ? "opacity-40" : "opacity-0")} />
+      </div>
+
       {/* Hero */}
       <header className="relative flex min-h-[66svh] flex-col justify-between overflow-hidden bg-night text-ivory">
         {cover ? (
@@ -183,37 +262,10 @@ function Home({ lang, onLang, onOpen }: { lang: Lang; onLang: (l: Lang) => void;
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,12,28,.55)_0%,rgba(7,12,28,.05)_30%,rgba(7,12,28,.35)_55%,#070c1c_100%)]" />
         <div className="grain absolute inset-0" />
 
-        <div className="relative flex items-center justify-between px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
-          <Image src="/brand/monogram.png" alt="Elypse Home" width={513} height={638} priority className="h-auto w-9 drop-shadow-lg" />
-          <div className="flex items-center gap-2">
-            {weather && (
-              <button
-                type="button"
-                onClick={() => onOpen("meteo")}
-                className="flex h-9 items-center gap-1.5 rounded-full border border-white/15 bg-night/30 px-3 text-sm font-semibold backdrop-blur-md"
-              >
-                <span>{weatherIcon(weather.current.code)}</span>
-                {weather.current.temp}°
-              </button>
-            )}
-            <div className="flex h-9 rounded-full border border-white/15 bg-night/30 p-0.5 backdrop-blur-md" role="group" aria-label="Langue">
-              {(["fr", "en"] as const).map((code) => (
-                <button
-                  key={code}
-                  type="button"
-                  onClick={() => onLang(code)}
-                  aria-pressed={lang === code}
-                  className={cn(
-                    "rounded-full px-3 text-[11px] font-bold tracking-[0.12em] uppercase transition",
-                    lang === code ? "bg-gold-foil text-night" : "text-ivory/70",
-                  )}
-                >
-                  {code}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Repère : la barre du haut change de style une fois la photo dépassée */}
+        <div ref={sentinel} aria-hidden className="pointer-events-none absolute inset-x-0 bottom-16 h-px" />
+
+        <div className="relative h-[calc(4.25rem+env(safe-area-inset-top))]" />
 
         <div className="relative px-6 pt-24 pb-14">
           <p className="animate-rise text-[11px] font-semibold tracking-[0.35em] text-gold-light uppercase">
