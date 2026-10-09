@@ -1,0 +1,226 @@
+// Schéma de la base Elypse Home — Prisma 7 + Neon.
+// Les textes bilingues sont stockés en JSON : { "fr": "...", "en": "..." }.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/* ------------------------------ Better Auth ------------------------------ */
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+/* --------------------------------- Images -------------------------------- */
+
+/// Photos stockées dans Postgres (compressées en WebP dans le navigateur avant
+/// l'envoi), servies par /api/images/[id] avec un cache immuable.
+model Image {
+  id        String   @id @default(uuid())
+  data      Bytes
+  mimeType  String
+  width     Int?
+  height    Int?
+  size      Int
+  createdAt DateTime @default(now())
+
+  @@map("image")
+}
+
+/* -------------------------------- Livrets -------------------------------- */
+
+model Livret {
+  id           String  @id @default(uuid())
+  /// Nom interne affiché dans le dashboard (ex : « Sourdière »).
+  name         String
+  /// Titre affiché aux voyageurs.
+  title        String
+  address      String  @default("")
+  city         String  @default("Paris")
+  latitude     Float?
+  longitude    Float?
+  /// Jeton long et aléatoire de l'URL publique /l/[token].
+  token        String  @unique
+  active       Boolean @default(true)
+  coverImageId String?
+
+  // Arrivée
+  checkinTime          String   @default("16:00")
+  buildingCode         String   @default("")
+  buildingInstructions Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  accessType           String   @default("")
+  keyboxCode           String   @default("")
+  keyInstructions      Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  facadeImageIds       String[] @default([])
+  videoUrl             String   @default("")
+  welcomeMessage       Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+
+  // Séjour
+  parking      Json   @default("{\"fr\":\"\",\"en\":\"\"}")
+  wifiSsid     String @default("")
+  wifiPassword String @default("")
+  rules        Json   @default("{\"fr\":\"\",\"en\":\"\"}")
+  /// Liste séparée par des virgules.
+  essentials   Json   @default("{\"fr\":\"\",\"en\":\"\"}")
+
+  // Départ
+  checkoutTime         String @default("10:00")
+  checkoutInstructions Json   @default("{\"fr\":\"\",\"en\":\"\"}")
+
+  // Contact
+  contactName     String @default("Elypse Home")
+  contactSubtitle String @default("Paris")
+  contactPhone    String @default("")
+  contactEmail    String @default("")
+  footerText      String @default("Elypse Home")
+
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recommendations Recommendation[]
+  equipments      Equipment[]
+  transports      Transport[]
+  contacts        Contact[]
+
+  @@map("livret")
+}
+
+model Recommendation {
+  id          String   @id @default(uuid())
+  livretId    String
+  livret      Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
+  name        String
+  category    String   @default("restaurant")
+  address     String   @default("")
+  description Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  imageId     String?
+  phone       String   @default("")
+  website     String   @default("")
+  travelTime  String   @default("")
+  travelMode  String   @default("")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([livretId])
+  @@map("recommendation")
+}
+
+model Equipment {
+  id           String   @id @default(uuid())
+  livretId     String
+  livret       Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
+  name         Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  category     String   @default("cuisine")
+  icon         String   @default("")
+  instructions Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  imageId      String?
+  tip          Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  tipType      String   @default("info")
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([livretId])
+  @@map("equipment")
+}
+
+model Transport {
+  id        String   @id @default(uuid())
+  livretId  String
+  livret    Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   @default("metro")
+  line      String   @default("")
+  color     String   @default("")
+  detail    Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  phone     String   @default("")
+  address   String   @default("")
+  url       String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([livretId])
+  @@map("transport")
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  livretId  String
+  livret    Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
+  name      String
+  type      String   @default("pharmacie")
+  phone     String   @default("")
+  address   String   @default("")
+  detail    Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([livretId])
+  @@map("contact")
+}
