@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, Link2, Loader2, RefreshCw } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Link2, Loader2, Printer, RefreshCw } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -17,7 +17,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { downloadBlob, printBlob, renderPrintCard } from "@/lib/print-card";
 import { cn } from "@/lib/utils";
+
+const slug = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 
 export function useCopy() {
   const [copied, setCopied] = useState(false);
@@ -35,11 +44,14 @@ export function LivretLinkPanel({
   livretId,
   url,
   name,
+  title,
   onRegenerated,
 }: {
   livretId: string;
   url: string;
   name: string;
+  /** Titre affiché aux voyageurs (utilisé sur la carte à imprimer). */
+  title?: string;
   onRegenerated?: (url: string) => void;
 }) {
   const { copied, copy } = useCopy();
@@ -50,6 +62,24 @@ export function LivretLinkPanel({
   useEffect(() => {
     QRCode.toDataURL(url, { margin: 1, width: 480, color: { dark: "#070c1c", light: "#ffffff" } }).then(setQr);
   }, [url]);
+
+  const [printing, setPrinting] = useState<"download" | "print" | null>(null);
+  async function card(mode: "download" | "print") {
+    setPrinting(mode);
+    try {
+      const blob = await renderPrintCard({ url, title: title || name });
+      if (mode === "download") {
+        downloadBlob(blob, `livret-${slug(name)}-a-imprimer.png`);
+        toast.success("Carte téléchargée");
+      } else if (!printBlob(blob, title || name)) {
+        toast.error("Fenêtre bloquée par le navigateur : autorisez les pop-ups ou utilisez « Télécharger ».");
+      }
+    } catch {
+      toast.error("Impossible de générer la carte.");
+    } finally {
+      setPrinting(null);
+    }
+  }
 
   function regenerate() {
     startTransition(async () => {
@@ -86,19 +116,24 @@ export function LivretLinkPanel({
       </div>
 
       {qr && (
-        <div className="flex items-center gap-4 rounded-xl border p-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={qr} alt="QR code du livret" className="size-20 rounded-md" />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium">QR code</p>
-            <p className="text-xs text-muted-foreground">À imprimer et poser dans l&apos;appartement.</p>
-            <a
-              href={qr}
-              download={`livret-${name.toLowerCase().replace(/[^a-z0-9]+/gi, "-")}-qr.png`}
-              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-gold-deep hover:underline"
-            >
-              <Download className="size-3" /> Télécharger
-            </a>
+        <div className="space-y-3 rounded-xl border p-3">
+          <div className="flex items-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qr} alt="QR code du livret" className="size-16 rounded-md" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Carte à imprimer</p>
+              <p className="text-xs text-muted-foreground">
+                Format A6 avec logo, titre et QR code, à poser dans l&apos;appartement.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="sm" disabled={!!printing} onClick={() => card("download")}>
+              {printing === "download" ? <Loader2 className="animate-spin" /> : <Download />} Télécharger
+            </Button>
+            <Button variant="outline" size="sm" disabled={!!printing} onClick={() => card("print")}>
+              {printing === "print" ? <Loader2 className="animate-spin" /> : <Printer />} Imprimer
+            </Button>
           </div>
         </div>
       )}
@@ -134,12 +169,14 @@ export function LivretLinkButton({
   livretId,
   url,
   name,
+  title,
   className,
   onRegenerated,
 }: {
   livretId: string;
   url: string;
   name: string;
+  title?: string;
   className?: string;
   onRegenerated?: (url: string) => void;
 }) {
@@ -151,7 +188,7 @@ export function LivretLinkButton({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(92vw,22rem)]">
-        <LivretLinkPanel livretId={livretId} url={url} name={name} onRegenerated={onRegenerated} />
+        <LivretLinkPanel livretId={livretId} url={url} name={name} title={title} onRegenerated={onRegenerated} />
       </PopoverContent>
     </Popover>
   );

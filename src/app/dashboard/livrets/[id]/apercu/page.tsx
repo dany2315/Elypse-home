@@ -39,7 +39,7 @@ export default async function ApercuPage(props: PageProps<"/dashboard/livrets/[i
               <ExternalLink /> Ouvrir
             </a>
           </Button>
-          <LivretLinkButton livretId={livret.id} url={url} name={livret.name} />
+          <LivretLinkButton livretId={livret.id} url={url} name={livret.name} title={livret.title} />
         </div>
       </div>
 

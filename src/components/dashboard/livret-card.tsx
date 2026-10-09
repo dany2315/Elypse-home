@@ -139,7 +139,7 @@ export function LivretCard({ livret }: { livret: LivretCardData }) {
               <Eye /> Aperçu
             </Link>
           </Button>
-          <LivretLinkButton livretId={livret.id} url={livret.url} name={livret.name} />
+          <LivretLinkButton livretId={livret.id} url={livret.url} name={livret.name} title={livret.title} />
         </div>
 
         <div className="mt-auto grid grid-cols-4 gap-1.5 border-t pt-4">
