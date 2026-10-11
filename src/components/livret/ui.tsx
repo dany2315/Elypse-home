@@ -4,7 +4,9 @@ import { Check, Copy, Navigation } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-export const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+/** Lien Google Maps ; avec un identifiant de fiche, ouvre exactement cet établissement. */
+export const mapsUrl = (q: string, placeId?: string) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}${placeId ? `&query_place_id=${encodeURIComponent(placeId)}` : ""}`;
 export const wazeUrl = (q: string) => `https://waze.com/ul?q=${encodeURIComponent(q)}&navigate=yes`;
 export const telUrl = (phone: string) => `tel:${phone.replace(/[^\d+]/g, "")}`;
 

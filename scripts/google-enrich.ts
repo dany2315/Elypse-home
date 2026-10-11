@@ -1,16 +1,16 @@
 /**
  * Associe chaque recommandation à sa fiche Google Maps (Places API) et complète
  * téléphone, site web et adresse s'ils sont vides (rien n'est écrasé).
+ * Seules ces informations et l'identifiant de fiche sont enregistrés : la clé API
+ * n'est utilisée que le temps du script et n'a pas à rester dans le projet.
  *
- * pnpm google:enrich           → rapport uniquement (aucune écriture)
- * pnpm google:enrich --apply   → enregistre les correspondances jugées fiables
- * pnpm google:enrich --apply --force-all → enregistre aussi les correspondances douteuses
+ * GOOGLE_MAPS_API_KEY=… pnpm google:enrich           → rapport uniquement
+ * GOOGLE_MAPS_API_KEY=… pnpm google:enrich --apply   → enregistre les correspondances fiables
  */
 import { prisma } from "../src/lib/db";
 import { searchPlace } from "../src/lib/google-places";
 
 const APPLY = process.argv.includes("--apply");
-const FORCE = process.argv.includes("--force-all");
 
 const norm = (s: string) =>
   s
@@ -19,6 +19,33 @@ const norm = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+
+/** Correspondances vérifiées à la main comme fausses (autre ville, autre établissement, autre boutique). */
+const SKIP: ((r: { name: string; address: string }) => boolean)[] = [
+  (r) => norm(r.name) === "sushi love",
+  (r) => norm(r.name) === "bottega romana",
+  (r) => norm(r.name) === "maison landemaine",
+  (r) => norm(r.name) === "carrefour city" && !r.address,
+];
+
+/** Requêtes précisées quand l'adresse saisie mène à une autre fiche. */
+const QUERY: Record<string, string> = {
+  "tour eiffel": "Tour Eiffel, Avenue Gustave Eiffel, 75007 Paris",
+};
+
+/** Annuaires tiers : on ne les présente pas comme « site web » de l'établissement. */
+const NOT_A_WEBSITE = ["moodmap.paris"];
+
+function cleanWebsite(url: string) {
+  if (!url || NOT_A_WEBSITE.some((h) => url.includes(h))) return "";
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (/^(utm_|igshid$|hl$)/.test(k)) u.searchParams.delete(k);
+    return u.toString().replace(/\?$/, "");
+  } catch {
+    return url;
+  }
+}
 
 /** Part des mots du nom saisi retrouvés dans le nom Google (0 → 1). */
 function similarity(ours: string, theirs: string) {
@@ -31,7 +58,7 @@ function similarity(ours: string, theirs: string) {
 
 async function main() {
   const recos = await prisma.recommendation.findMany({
-    select: { id: true, name: true, address: true, phone: true, website: true, googlePlaceId: true },
+    select: { id: true, name: true, address: true, phone: true, website: true },
   });
 
   // Une seule recherche par établissement (certains apparaissent dans plusieurs livrets).
@@ -41,45 +68,44 @@ async function main() {
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
 
-  let ok = 0;
-  let doubtful = 0;
-  let missing = 0;
+  let saved = 0;
+  let skipped = 0;
   for (const rows of groups.values()) {
     const r = rows[0];
-    const query = [r.name.replace(/\s*★+/g, ""), r.address || "Paris"].join(", ");
+    if (SKIP.some((rule) => rule(r))) {
+      skipped++;
+      console.log(`–  ${r.name} — écarté (correspondance fausse)`);
+      continue;
+    }
+    const query = QUERY[norm(r.name)] ?? [r.name.replace(/\s*★+/g, ""), r.address || "Paris"].join(", ");
     const match = await searchPlace(query).catch((e) => {
       console.error(`✗ ${r.name} : ${(e as Error).message}`);
       return null;
     });
-    if (!match) {
-      missing++;
-      console.log(`∅  ${r.name} — aucune fiche trouvée`);
+    if (!match || similarity(r.name, match.name) < 0.3) {
+      skipped++;
+      console.log(`∅  ${r.name} — pas de fiche fiable${match ? ` (${match.name})` : ""}`);
       continue;
     }
-    const score = similarity(r.name, match.name);
-    const reliable = score >= 0.5;
-    if (reliable) ok++;
-    else doubtful++;
-    console.log(
-      `${reliable ? "✓" : "?"}  ${r.name}  →  ${match.name} · ${match.address}` +
-        `${match.phone ? ` · ${match.phone}` : ""}${match.website ? ` · ${match.website}` : ""}`,
-    );
+    const website = cleanWebsite(match.website);
+    console.log(`✓  ${r.name} → ${match.name} · ${match.address}${match.phone ? ` · ${match.phone}` : ""}${website ? ` · ${website}` : ""}`);
 
-    if (APPLY && (reliable || FORCE)) {
+    if (APPLY) {
       for (const row of rows) {
         await prisma.recommendation.update({
           where: { id: row.id },
           data: {
             googlePlaceId: match.id,
             phone: row.phone || match.phone,
-            website: row.website || match.website,
+            website: row.website || website,
             address: row.address || match.address,
           },
         });
+        saved++;
       }
     }
   }
-  console.log(`\n${ok} fiables, ${doubtful} douteuses, ${missing} introuvables — ${APPLY ? "enregistré" : "rapport seulement"}`);
+  console.log(`\n${APPLY ? `${saved} recommandations enregistrées` : "rapport seulement"} · ${skipped} écartées`);
 }
 
 main().finally(() => prisma.$disconnect());

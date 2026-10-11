@@ -399,7 +399,7 @@ export function RecosManager({ livretId, items }: { livretId: string; items: Rec
           </Field>
           <TextField
             label="Fiche Google Maps (identifiant)"
-            hint="Rempli automatiquement. Photo, note et horaires Google sont alors affichés dans le livret."
+            hint="Rempli automatiquement : le bouton « Itinéraire » ouvre alors la fiche Google Maps exacte."
             value={d.googlePlaceId}
             onChange={(googlePlaceId) => set({ googlePlaceId })}
             placeholder="ChIJ…"

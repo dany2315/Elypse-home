@@ -32,8 +32,8 @@ Les photos sont compressées en WebP dans le navigateur (≈ 200 Ko), stockées 
 
 ## Google Maps
 
-Avec `GOOGLE_MAPS_API_KEY` (Places API (New) activée), chaque recommandation reliée à sa fiche Google affiche dans le livret sa photo Google Maps (avec le crédit de l'auteur), sa note, « ouvert / fermé » et ses horaires. Seul l'identifiant de fiche est stocké ; le reste est lu chez Google (cache de 30 min à 6 h). La route `/api/places/[id]` n'accepte que les fiches présentes dans les livrets.
+`GOOGLE_MAPS_API_KEY=… pnpm google:enrich --apply` relie chaque recommandation à sa fiche Google Maps (Places API) et complète téléphone, site web et adresse vides. La clé n'est utilisée que le temps du script : elle n'a pas à figurer dans `.env` ni sur Vercel. Le bouton « Itinéraire » ouvre ensuite la fiche exacte.
 
 ## Déploiement (Vercel)
 
-Variables à renseigner dans Vercel : `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`, `GOOGLE_MAPS_API_KEY`. Les URLs Vercel (production et previews) sont reconnues automatiquement ; `BETTER_AUTH_URL` ne sert que pour un domaine personnalisé (ex. `https://livret.mondomaine.com`).
+Variables à renseigner dans Vercel : `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`. Les URLs Vercel (production et previews) sont reconnues automatiquement ; `BETTER_AUTH_URL` ne sert que pour un domaine personnalisé (ex. `https://livret.mondomaine.com`).

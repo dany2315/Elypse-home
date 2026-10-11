@@ -32,7 +32,6 @@ import {
 import { imageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { useLivret } from "./context";
-import { GooglePlace } from "./google-place";
 import {
   Card,
   CodeDisplay,
@@ -658,7 +657,7 @@ export function RecosPage() {
               />
               <div className="mt-4 flex flex-wrap gap-2">
                 <ActionChip
-                  href={mapsUrl(q)}
+                  href={mapsUrl(q, r.googlePlaceId)}
                   icon={<MapPin className="size-3.5" />}
                   dark
                 >
@@ -697,19 +696,7 @@ export function RecosPage() {
             key={r.id}
             className="overflow-hidden rounded-[1.6rem] border border-[#ebe3d3] bg-white shadow-[0_18px_40px_-32px_rgba(18,22,42,.4)]"
           >
-            {r.googlePlaceId ? (
-              <GooglePlace
-                placeId={r.googlePlaceId}
-                lang={lang}
-                alt={r.name}
-                showPhoto={!r.imageId && !r.photoUrl}
-                onOpenImage={openImage}
-              >
-                {card}
-              </GooglePlace>
-            ) : (
-              card
-            )}
+            {card}
           </article>
         );
       })}
