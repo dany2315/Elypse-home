@@ -32,6 +32,7 @@ import {
 import { imageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { useLivret } from "./context";
+import { GooglePlace } from "./google-place";
 import {
   Card,
   CodeDisplay,
@@ -696,7 +697,19 @@ export function RecosPage() {
             key={r.id}
             className="overflow-hidden rounded-[1.6rem] border border-[#ebe3d3] bg-white shadow-[0_18px_40px_-32px_rgba(18,22,42,.4)]"
           >
-            {card}
+            {r.googlePlaceId ? (
+              <GooglePlace
+                placeId={r.googlePlaceId}
+                lang={lang}
+                alt={r.name}
+                showPhoto={!r.imageId && !r.photoUrl}
+                onOpenImage={openImage}
+              >
+                {card}
+              </GooglePlace>
+            ) : (
+              card
+            )}
           </article>
         );
       })}
