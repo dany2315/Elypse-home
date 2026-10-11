@@ -38,6 +38,8 @@ const livretSchema = z.object({
   keyInstructions: loc,
   facadeImageIds: z.array(z.string()).default([]),
   videoUrl: str,
+  locationImageIds: z.array(z.string()).default([]),
+  locationNote: loc,
   welcomeMessage: loc,
   parking: loc,
   wifiSsid: str,
@@ -146,12 +148,12 @@ export async function updateLivret(id: string, input: LivretInput): Promise<Resu
     const data = livretSchema.parse(input);
     const before = await prisma.livret.findUniqueOrThrow({
       where: { id },
-      select: { coverImageId: true, facadeImageIds: true },
+      select: { coverImageId: true, facadeImageIds: true, locationImageIds: true },
     });
     await prisma.livret.update({ where: { id }, data });
     // Photos remplacées ou retirées : supprimées seulement maintenant que l'enregistrement est fait.
-    const kept = new Set([data.coverImageId, ...data.facadeImageIds]);
-    await cleanupImages([before.coverImageId, ...before.facadeImageIds].filter((img) => !kept.has(img)));
+    const kept = new Set([data.coverImageId, ...data.facadeImageIds, ...data.locationImageIds]);
+    await cleanupImages([before.coverImageId, ...before.facadeImageIds, ...before.locationImageIds].filter((img) => !kept.has(img)));
     refresh(id);
     return { ok: true };
   } catch (e) {

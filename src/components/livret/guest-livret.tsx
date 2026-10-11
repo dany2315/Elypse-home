@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { Lang } from "@/lib/localized";
+import { type Lang, saveGuestLang } from "@/lib/localized";
 import { imageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
 import { type GuestData, LivretProvider, useLivret } from "./context";
@@ -87,7 +87,7 @@ export function GuestLivret({ data, initialLang }: { data: GuestData; initialLan
 
   function changeLang(next: Lang) {
     setLang(next);
-    document.cookie = `elypse-lang=${next}; path=/; max-age=31536000; samesite=lax`;
+    saveGuestLang(next);
   }
 
   const open = useCallback((id: PageId) => {

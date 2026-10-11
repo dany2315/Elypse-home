@@ -115,6 +115,9 @@ model Livret {
   keyInstructions      Json     @default("{\"fr\":\"\",\"en\":\"\"}")
   facadeImageIds       String[] @default([])
   videoUrl             String   @default("")
+  /// Page « Emplacement » (/l/[token]/emplacement) : photos de l'emplacement et mot d'accompagnement.
+  locationImageIds     String[] @default([])
+  locationNote         Json     @default("{\"fr\":\"\",\"en\":\"\"}")
   welcomeMessage       Json     @default("{\"fr\":\"\",\"en\":\"\"}")
 
   // Séjour

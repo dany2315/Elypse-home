@@ -7,6 +7,7 @@ const unused = Prisma.sql`
     SELECT 1 FROM livret l
     WHERE l."coverImageId" = i.id
        OR i.id = ANY(l."facadeImageIds")
+       OR i.id = ANY(l."locationImageIds")
        OR l."videoUrl" = '/api/images/' || i.id
   )
   AND NOT EXISTS (SELECT 1 FROM recommendation r WHERE r."imageId" = i.id)

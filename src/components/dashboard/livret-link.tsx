@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, Link2, Loader2, Printer, RefreshCw } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Link2, Loader2, MapPin, Printer, RefreshCw } from "lucide-react";
 import QRCode from "qrcode";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -27,6 +27,32 @@ const slug = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+
+/** Lien de la page « Emplacement » (photos de l'adresse + accès au livret). */
+export const emplacementUrl = (livretUrl: string) => `${livretUrl.replace(/\/$/, "")}/emplacement`;
+
+/** Bloc « Page emplacement » : lien, copier, ouvrir. */
+export function EmplacementLink({ url, className }: { url: string; className?: string }) {
+  const { copied, copy } = useCopy();
+  return (
+    <div className={cn("space-y-2 rounded-xl border p-3", className)}>
+      <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+        <MapPin className="size-3 text-gold-deep" /> Page emplacement
+      </p>
+      <p className="font-mono text-[11px] leading-relaxed break-all text-ink/80">{url}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button size="sm" onClick={() => copy(url, "Lien de la page emplacement copié")}>
+          {copied ? <Check /> : <Copy />} {copied ? "Copié" : "Copier"}
+        </Button>
+        <Button size="sm" variant="outline" asChild>
+          <a href={url} target="_blank" rel="noreferrer">
+            <ExternalLink /> Ouvrir
+          </a>
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function useCopy() {
   const [copied, setCopied] = useState(false);
@@ -115,6 +141,8 @@ export function LivretLinkPanel({
         </Button>
       </div>
 
+      <EmplacementLink url={emplacementUrl(url)} />
+
       {qr && (
         <div className="space-y-3 rounded-xl border p-3">
           <div className="flex items-center gap-4">
@@ -143,7 +171,7 @@ export function LivretLinkPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Régénérer le lien ?</AlertDialogTitle>
             <AlertDialogDescription>
-              Un nouveau lien sera créé pour « {name} ». L&apos;ancien lien cessera immédiatement de fonctionner
+              Un nouveau lien sera créé pour « {name} ». L&apos;ancien lien (et celui de la page emplacement) cessera immédiatement de fonctionner
               (pensez à mettre à jour vos messages automatiques et QR codes imprimés).
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -340,6 +340,7 @@ async function removeLivret(id: string) {
   const mediaIds = [
     old.coverImageId,
     ...old.facadeImageIds,
+    ...old.locationImageIds,
     old.videoUrl.startsWith("/api/images/") ? old.videoUrl.split("/").pop() : null,
     ...old.recommendations.map((r) => r.imageId),
     ...old.equipments.map((e) => e.imageId),

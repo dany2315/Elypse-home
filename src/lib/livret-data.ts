@@ -27,6 +27,8 @@ export function toLivretForm(l: Livret) {
     keyInstructions: asLocalized(l.keyInstructions),
     facadeImageIds: l.facadeImageIds,
     videoUrl: l.videoUrl,
+    locationImageIds: l.locationImageIds,
+    locationNote: asLocalized(l.locationNote),
     welcomeMessage: asLocalized(l.welcomeMessage),
     parking: asLocalized(l.parking),
     wifiSsid: l.wifiSsid,

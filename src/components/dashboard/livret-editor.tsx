@@ -27,11 +27,12 @@ import { cn } from "@/lib/utils";
 import { BiField, Field, Section, TextField } from "./fields";
 import { ImageUpload, MultiImageUpload } from "./image-upload";
 import { ContactsManager, EquipmentsManager, RecosManager, TransportsManager } from "./item-managers";
-import { LivretLinkButton } from "./livret-link";
+import { EmplacementLink, emplacementUrl, LivretLinkButton } from "./livret-link";
 
 const TABS = [
   { value: "general", label: "Général" },
   { value: "arrivee", label: "Arrivée" },
+  { value: "emplacement", label: "Emplacement" },
   { value: "sejour", label: "Séjour" },
   { value: "depart", label: "Départ" },
   { value: "assistance", label: "Assistance" },
@@ -41,7 +42,7 @@ const TABS = [
   { value: "contacts", label: "Contacts utiles" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
-const FORM_TABS: Tab[] = ["general", "arrivee", "sejour", "depart", "assistance"];
+const FORM_TABS: Tab[] = ["general", "arrivee", "emplacement", "sejour", "depart", "assistance"];
 
 export function LivretEditor({
   id,
@@ -243,6 +244,35 @@ export function LivretEditor({
                 value={form.videoUrl}
                 onChange={set("videoUrl")}
                 placeholder="https://"
+              />
+            </Section>
+          </>
+        )}
+
+        {tab === "emplacement" && (
+          <>
+            <Section
+              title="Page emplacement"
+              description="Une page à envoyer avant l'arrivée : photos de l'emplacement, adresse, carte et itinéraire, avec un bouton vers le livret d'accueil."
+            >
+              <EmplacementLink url={emplacementUrl(url)} />
+            </Section>
+            <Section
+              title="Photos de l'emplacement"
+              description="Rue, façade, porte d'entrée… Sans photo ici, la page affiche les photos de devanture, sinon la photo de couverture."
+            >
+              <MultiImageUpload value={form.locationImageIds} onChange={set("locationImageIds")} max={8} />
+              <BiField
+                label="Mot d'accompagnement (facultatif)"
+                hint="Affiché sous l'adresse, par exemple pour repérer l'entrée."
+                multiline
+                rows={3}
+                value={form.locationNote}
+                onChange={set("locationNote")}
+                placeholder={{
+                  fr: "La porte cochère bleue, entre la boulangerie et le fleuriste.",
+                  en: "The blue carriage door, between the bakery and the florist.",
+                }}
               />
             </Section>
           </>

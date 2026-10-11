@@ -12,3 +12,8 @@ export async function getBaseUrl() {
 export function livretPath(token: string) {
   return `/l/${token}`;
 }
+
+/** Page « Emplacement » : photos de l'adresse + accès au livret. */
+export function emplacementPath(token: string) {
+  return `/l/${token}/emplacement`;
+}

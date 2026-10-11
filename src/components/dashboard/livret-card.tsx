@@ -2,8 +2,11 @@
 
 import {
   Bus,
+  Check,
+  ExternalLink,
   Eye,
   Loader2,
+  MapPin,
   MoreHorizontal,
   Pencil,
   Phone,
@@ -25,7 +28,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { imageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
-import { LivretLinkButton } from "./livret-link";
+import { emplacementUrl, LivretLinkButton, useCopy } from "./livret-link";
+
+/** Copier / ouvrir le lien de la page « Emplacement ». */
+function EmplacementButton({ url }: { url: string }) {
+  const { copied, copy } = useCopy();
+  return (
+    <div className="flex overflow-hidden rounded-lg border border-gold/40 bg-accent/40">
+      <button
+        type="button"
+        onClick={() => copy(url, "Lien de la page emplacement copié")}
+        className="flex h-9 flex-1 items-center justify-center gap-2 text-sm font-medium text-ink transition hover:bg-accent"
+      >
+        {copied ? <Check className="size-4 text-emerald-700" /> : <MapPin className="size-4 text-gold-deep" />}
+        {copied ? "Lien copié" : "Copier le lien Emplacement"}
+      </button>
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex h-9 w-10 items-center justify-center border-l border-gold/30 text-ink/70 transition hover:bg-accent hover:text-ink"
+        aria-label="Ouvrir la page emplacement"
+      >
+        <ExternalLink className="size-4" />
+      </a>
+    </div>
+  );
+}
 
 export type LivretCardData = {
   id: string;
@@ -141,6 +170,8 @@ export function LivretCard({ livret }: { livret: LivretCardData }) {
           </Button>
           <LivretLinkButton livretId={livret.id} url={livret.url} name={livret.name} title={livret.title} />
         </div>
+
+        <EmplacementButton url={emplacementUrl(livret.url)} />
 
         <div className="mt-auto grid grid-cols-4 gap-1.5 border-t pt-4">
           {sections.map(({ tab, label, icon: Icon, key }) => (

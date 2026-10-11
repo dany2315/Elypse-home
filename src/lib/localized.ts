@@ -15,3 +15,8 @@ export function t(value: unknown, lang: Lang): string {
   const l = asLocalized(value);
   return (lang === "en" && l.en?.trim() ? l.en : l.fr) ?? "";
 }
+
+/** Mémorise la langue choisie par le voyageur (lue côté serveur au prochain chargement). */
+export function saveGuestLang(lang: Lang) {
+  document.cookie = `elypse-lang=${lang}; path=/; max-age=31536000; samesite=lax`;
+}
