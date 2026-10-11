@@ -253,7 +253,7 @@ export function LivretEditor({
           <>
             <Section
               title="Page emplacement"
-              description="Une page à envoyer avant l'arrivée : photos de l'emplacement, adresse, carte et itinéraire, avec un bouton vers le livret d'accueil."
+              description="Une page à envoyer avant l'arrivée : le titre du logement et les photos de son emplacement, avec un discret lien vers le livret d'accueil."
             >
               <EmplacementLink url={emplacementUrl(url)} />
             </Section>
@@ -262,18 +262,6 @@ export function LivretEditor({
               description="Rue, façade, porte d'entrée… Sans photo ici, la page affiche les photos de devanture, sinon la photo de couverture."
             >
               <MultiImageUpload value={form.locationImageIds} onChange={set("locationImageIds")} max={8} />
-              <BiField
-                label="Mot d'accompagnement (facultatif)"
-                hint="Affiché sous l'adresse, par exemple pour repérer l'entrée."
-                multiline
-                rows={3}
-                value={form.locationNote}
-                onChange={set("locationNote")}
-                placeholder={{
-                  fr: "La porte cochère bleue, entre la boulangerie et le fleuriste.",
-                  en: "The blue carriage door, between the bakery and the florist.",
-                }}
-              />
             </Section>
           </>
         )}

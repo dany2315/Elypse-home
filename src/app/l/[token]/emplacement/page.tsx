@@ -5,22 +5,16 @@ import { Unavailable } from "@/components/livret/unavailable";
 import { getSession } from "@/lib/auth";
 import { livretPath } from "@/lib/base-url";
 import { prisma } from "@/lib/db";
-import { guestLang } from "@/lib/guest-lang";
-import { asLocalized } from "@/lib/localized";
 
 const getLivret = cache((token: string) =>
   prisma.livret.findUnique({
     where: { token },
     select: {
       title: true,
-      address: true,
-      city: true,
       active: true,
-      checkinTime: true,
       coverImageId: true,
       facadeImageIds: true,
       locationImageIds: true,
-      locationNote: true,
     },
   }),
 );
@@ -51,18 +45,5 @@ export default async function EmplacementPage(props: PageProps<"/l/[token]/empla
         ? [livret.coverImageId]
         : [];
 
-  return (
-    <LocationPage
-      initialLang={await guestLang()}
-      livretHref={livretPath(token)}
-      data={{
-        title: livret.title,
-        address: livret.address,
-        city: livret.city,
-        checkinTime: livret.checkinTime,
-        photoIds: photos,
-        note: asLocalized(livret.locationNote),
-      }}
-    />
-  );
+  return <LocationPage title={livret.title} photoIds={photos} livretHref={livretPath(token)} />;
 }
