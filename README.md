@@ -28,7 +28,12 @@ Les photos sont compressées en WebP dans le navigateur (≈ 200 Ko), stockées 
 | `pnpm db:seed` | Crée / met à jour le compte admin |
 | `pnpm db:studio` | Explorateur de base Prisma |
 | `pnpm db:import` | Importe les livrets existants (methodeatlas) |
+| `pnpm google:enrich` | Relie les recommandations à Google Maps (rapport ; `--apply` pour enregistrer) |
+
+## Google Maps
+
+Avec `GOOGLE_MAPS_API_KEY` (Places API (New) activée), chaque recommandation reliée à sa fiche Google affiche dans le livret sa photo Google Maps (avec le crédit de l'auteur), sa note, « ouvert / fermé » et ses horaires. Seul l'identifiant de fiche est stocké ; le reste est lu chez Google (cache de 30 min à 6 h). La route `/api/places/[id]` n'accepte que les fiches présentes dans les livrets.
 
 ## Déploiement (Vercel)
 
-Variables à renseigner dans Vercel : `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`. Les URLs Vercel (production et previews) sont reconnues automatiquement ; `BETTER_AUTH_URL` ne sert que pour un domaine personnalisé (ex. `https://livret.mondomaine.com`).
+Variables à renseigner dans Vercel : `DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `BETTER_AUTH_SECRET`, `GOOGLE_MAPS_API_KEY`. Les URLs Vercel (production et previews) sont reconnues automatiquement ; `BETTER_AUTH_URL` ne sert que pour un domaine personnalisé (ex. `https://livret.mondomaine.com`).

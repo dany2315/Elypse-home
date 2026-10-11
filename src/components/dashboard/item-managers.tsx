@@ -325,6 +325,11 @@ function OptionSelect({
   );
 }
 
+const remoteThumb = (url: string) => (
+  // eslint-disable-next-line @next/next/no-img-element
+  <img src={url} alt="" className="size-full object-cover" />
+);
+
 const thumb = (imageId: string | null, fallback: string) =>
   imageId ? (
     // eslint-disable-next-line @next/next/no-img-element
@@ -351,6 +356,10 @@ export function RecosManager({ livretId, items }: { livretId: string; items: Rec
         address: "",
         description: { fr: "", en: "" },
         imageId: null,
+        googlePlaceId: "",
+        photoUrl: "",
+        photoCredit: "",
+        photoCreditUrl: "",
         phone: "",
         website: "",
         travelTime: "",
@@ -359,7 +368,7 @@ export function RecosManager({ livretId, items }: { livretId: string; items: Rec
       row={(r) => {
         const cat = findOption(RECO_CATEGORIES, r.category);
         return {
-          icon: thumb(r.imageId, cat.icon),
+          icon: r.imageId ? thumb(r.imageId, cat.icon) : r.photoUrl ? remoteThumb(r.photoUrl) : cat.icon,
           title: r.name,
           subtitle: [cat.fr, r.address].filter(Boolean).join(" · "),
           meta: r.travelTime ? `${findOption(TRAVEL_MODES, r.travelMode).icon} ${r.travelTime}` : undefined,
@@ -385,9 +394,27 @@ export function RecosManager({ livretId, items }: { livretId: string; items: Rec
             <TextField label="Temps de trajet" value={d.travelTime} onChange={(travelTime) => set({ travelTime })} placeholder="5 min" />
             <OptionSelect label="Mode de trajet" value={d.travelMode} onChange={(travelMode) => set({ travelMode })} options={TRAVEL_MODES} />
           </div>
-          <Field label="Photo (facultatif)">
+          <Field label="Photo (facultatif)" hint="Une photo envoyée ici remplace la photo par lien ci-dessous.">
             <ImageUpload value={d.imageId} onChange={(imageId) => set({ imageId })} aspect="aspect-[2/1]" />
           </Field>
+          <TextField
+            label="Fiche Google Maps (identifiant)"
+            hint="Rempli automatiquement. Photo, note et horaires Google sont alors affichés dans le livret."
+            value={d.googlePlaceId}
+            onChange={(googlePlaceId) => set({ googlePlaceId })}
+            placeholder="ChIJ…"
+          />
+          <TextField
+            label="Photo par lien (Unsplash, Wikimedia…)"
+            value={d.photoUrl}
+            onChange={(photoUrl) => set({ photoUrl, ...(photoUrl ? {} : { photoCredit: "", photoCreditUrl: "" }) })}
+            placeholder="https://images.unsplash.com/…"
+          />
+          {d.photoUrl && !d.imageId && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={d.photoUrl} alt="" className="aspect-[2/1] w-full rounded-2xl object-cover" />
+          )}
+          {d.photoCredit && <p className="-mt-3 text-xs text-muted-foreground">Crédit : {d.photoCredit}</p>}
         </>
       )}
     />

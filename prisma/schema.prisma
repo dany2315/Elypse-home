@@ -162,6 +162,12 @@ model Recommendation {
   imageId     String?
   phone       String   @default("")
   website     String   @default("")
+  /// Fiche Google Maps (Places API) : photo, note et horaires sont lus en direct depuis Google.
+  googlePlaceId  String   @default("")
+  /// Photo par lien (facultatif) et crédit de son auteur.
+  photoUrl       String   @default("")
+  photoCredit    String   @default("")
+  photoCreditUrl String   @default("")
   travelTime  String   @default("")
   travelMode  String   @default("")
   sortOrder   Int      @default(0)
