@@ -4,11 +4,11 @@ import { nextCookies } from "better-auth/next-js";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { SITE_HOSTS, SITE_URL } from "@/lib/site";
 
 /**
  * Hôtes autorisés : local, URLs Vercel (fournies automatiquement par Vercel :
- * production, branche, déploiement) et domaine personnalisé éventuel (BETTER_AUTH_URL).
- * Aucune variable à renseigner sur Vercel tant qu'on n'utilise pas de domaine perso.
+ * production, branche, déploiement), domaine officiel elypsehome.com (+ www) et BETTER_AUTH_URL éventuel.
  */
 const hostOf = (url?: string) => (url ? new URL(url).host : undefined);
 const { BETTER_AUTH_URL, VERCEL_PROJECT_PRODUCTION_URL, VERCEL_BRANCH_URL, VERCEL_URL } = process.env;
@@ -16,17 +16,18 @@ const { BETTER_AUTH_URL, VERCEL_PROJECT_PRODUCTION_URL, VERCEL_BRANCH_URL, VERCE
 const allowedHosts = [
   "localhost:*",
   "127.0.0.1:*",
+  ...SITE_HOSTS,
   hostOf(BETTER_AUTH_URL),
   VERCEL_PROJECT_PRODUCTION_URL,
   VERCEL_BRANCH_URL,
   VERCEL_URL,
 ].filter((h): h is string => Boolean(h));
 
-const fallback =
-  BETTER_AUTH_URL ?? (VERCEL_PROJECT_PRODUCTION_URL ? `https://${VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000");
+const fallback = BETTER_AUTH_URL ?? (process.env.VERCEL_ENV === "production" ? SITE_URL : "http://localhost:3000");
 
 export const auth = betterAuth({
   baseURL: { allowedHosts, fallback },
+  trustedOrigins: SITE_HOSTS.map((h) => `https://${h}`),
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
     enabled: true,
