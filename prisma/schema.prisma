@@ -10,7 +10,9 @@ datasource db {
   provider = "postgresql"
 }
 
-/* ------------------------------ Better Auth ------------------------------ */
+/**
+ * ------------------------------ Better Auth ------------------------------
+ */
 
 model User {
   id            String    @id
@@ -73,7 +75,9 @@ model Verification {
   @@map("verification")
 }
 
-/* --------------------------------- Images -------------------------------- */
+/**
+ * --------------------------------- Images --------------------------------
+ */
 
 /// Photos stockées dans Postgres (compressées en WebP dans le navigateur avant
 /// l'envoi), servies par /api/images/[id] avec un cache immuable.
@@ -89,7 +93,9 @@ model Image {
   @@map("image")
 }
 
-/* -------------------------------- Livrets -------------------------------- */
+/**
+ * -------------------------------- Livrets --------------------------------
+ */
 
 model Livret {
   id           String  @id @default(uuid())
@@ -147,32 +153,34 @@ model Livret {
   equipments      Equipment[]
   transports      Transport[]
   contacts        Contact[]
+  /// Biens (module Finances) reliés à ce livret.
+  biens           Bien[]
 
   @@map("livret")
 }
 
 model Recommendation {
-  id          String   @id @default(uuid())
-  livretId    String
-  livret      Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
-  name        String
-  category    String   @default("restaurant")
-  address     String   @default("")
-  description Json     @default("{\"fr\":\"\",\"en\":\"\"}")
-  imageId     String?
-  phone       String   @default("")
-  website     String   @default("")
+  id             String   @id @default(uuid())
+  livretId       String
+  livret         Livret   @relation(fields: [livretId], references: [id], onDelete: Cascade)
+  name           String
+  category       String   @default("restaurant")
+  address        String   @default("")
+  description    Json     @default("{\"fr\":\"\",\"en\":\"\"}")
+  imageId        String?
+  phone          String   @default("")
+  website        String   @default("")
   /// Fiche Google Maps (Places API) : photo, note et horaires sont lus en direct depuis Google.
   googlePlaceId  String   @default("")
   /// Photo par lien (facultatif) et crédit de son auteur.
   photoUrl       String   @default("")
   photoCredit    String   @default("")
   photoCreditUrl String   @default("")
-  travelTime  String   @default("")
-  travelMode  String   @default("")
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  travelTime     String   @default("")
+  travelMode     String   @default("")
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([livretId])
   @@map("recommendation")
@@ -232,4 +240,112 @@ model Contact {
 
   @@index([livretId])
   @@map("contact")
+}
+
+/**
+ * ------------------------------- Finances --------------------------------
+ */
+// Données lues dans Hostaway (lecture seule) ; voir docs/finances-hostaway.md.
+
+/// Logement physique : regroupe un ou plusieurs listings Hostaway (ex. une annonce
+/// Booking par listing). Les rapports financiers sont faits par bien.
+model Bien {
+  id        String            @id @default(uuid())
+  name      String
+  livretId  String?
+  livret    Livret?           @relation(fields: [livretId], references: [id], onDelete: SetNull)
+  listings  HostawayListing[]
+  sortOrder Int               @default(0)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([livretId])
+  @@map("bien")
+}
+
+model HostawayListing {
+  /// Identifiant Hostaway du listing (listingMapId des réservations).
+  id           Int           @id
+  name         String        @default("")
+  internalName String        @default("")
+  /// Plateformes vues dans les réservations de ce listing (airbnbOfficial, bookingcom, direct…).
+  channels     String[]      @default([])
+  /// false si le listing n'est plus renvoyé par Hostaway.
+  active       Boolean       @default(true)
+  bienId       String?
+  bien         Bien?         @relation(fields: [bienId], references: [id], onDelete: SetNull)
+  reservations Reservation[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([bienId])
+  @@map("hostaway_listing")
+}
+
+/// Réservation Hostaway. Aucune donnée personnelle du voyageur (nom, e-mail, téléphone…).
+/// Montants en centimes, calculés à la synchro par src/lib/finances/mapping.ts.
+model Reservation {
+  /// Identifiant Hostaway de la réservation.
+  id                   Int             @id
+  listingId            Int
+  listing              HostawayListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  channelId            Int?
+  /// Plateforme : airbnbOfficial, bookingcom, direct…
+  channel              String
+  /// Référence de la réservation chez la plateforme (contrôle des doublons).
+  channelReservationId String?
+  status               String
+  arrivalDate          DateTime        @db.Date
+  departureDate        DateTime        @db.Date
+  /// Date de réservation (jour, heure du compte Hostaway).
+  reservationDate      DateTime?       @db.Date
+  nights               Int
+  currency             String          @default("EUR")
+
+  /// Revenus de location : payé par le voyageur, hors taxe de séjour.
+  revenueCents     Int @default(0)
+  /// Commission de la plateforme (Airbnb, Booking…).
+  commissionCents  Int @default(0)
+  /// Frais de traitement du paiement.
+  paymentFeesCents Int @default(0)
+  /// Versement total = revenus − commissions − frais de paiement (avant impôts).
+  payoutCents      Int @default(0)
+  /// Taxe de séjour (City Tax).
+  cityTaxCents     Int @default(0)
+  /// Frais de ménage réellement facturés dans la réservation (0 sinon).
+  cleaningFeeCents Int @default(0)
+  /// totalPrice Hostaway (référence).
+  totalPriceCents  Int @default(0)
+
+  /// Champs Hostaway non personnels : { reservation: {...}, finance: {...} }.
+  raw               Json
+  /// updatedOn Hostaway : le détail financier n'est relu que s'il change.
+  hostawayUpdatedOn String?
+  financeFetchedAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([listingId])
+  @@index([arrivalDate])
+  @@index([departureDate])
+  @@index([reservationDate])
+  @@map("reservation")
+}
+
+/// Ligne unique (id = "default") : jeton Hostaway et état de la dernière synchro.
+model HostawayState {
+  id              String    @id @default("default")
+  accessToken     String?
+  tokenExpiresAt  DateTime?
+  lastSyncAt      DateTime?
+  /// "ok" | "partial" | "error"
+  lastSyncStatus  String?
+  lastSyncMessage String?
+  lastSyncStats   Json?
+  lastFullSyncAt  DateTime?
+  /// Verrou : évite deux synchros simultanées.
+  syncLockedUntil DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@map("hostaway_state")
 }
