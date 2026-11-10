@@ -126,6 +126,9 @@ describe("buildReport", () => {
     assert.equal(def.total.payout, 8500);
     assert.equal(def.total.stays, 1);
     assert.equal(def.cancelledExcluded, 1);
+    // Une annulation hors de la période n'est pas comptée parmi les exclues.
+    const other = resa({ id: 23, status: "cancelled", arrival: "2026-12-01", departure: "2026-12-03" });
+    assert.equal(buildReport({ ...base, reservations: [keep, none, other], cancellations: "versement" }).cancelledExcluded, 1);
     assert.equal(buildReport({ ...base, cancellations: "toutes" }).total.stays, 2);
     assert.equal(buildReport({ ...base, cancellations: "aucune" }).total.stays, 0);
   });

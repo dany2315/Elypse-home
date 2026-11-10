@@ -36,7 +36,7 @@ Code : `src/lib/finances/mapping.ts` (testé dans `report.test.ts`).
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
 | **Ménage** | `f.cleaningFeeValue` (à défaut `r.cleaningFee`, puis `r.airbnbListingCleaningFee`) | Uniquement s'il a été facturé : 39 réservations sur 750. Sinon 0 €. Un frais par séjour, compté au mois d'arrivée. |
 | Séjours / nuits | `r.nights` (à défaut départ − arrivée) | |
-| Occupation | nuits occupées / nuits du calendrier × biens | Option (interrupteur « Occupation »). Les nuits bloquées ne sont pas déduites, car l'API calendrier n'est pas lue. |
+| Occupation | nuits occupées / nuits du calendrier × biens | Option (interrupteur « Occupation »). Les nuits bloquées ne sont pas déduites, car l'API calendrier n'est pas lue. Toute l'année compte, y compris les mois d'avant la mise en location (janvier-mars 2026) : l'occupation annuelle 2026 (35,9 %) est donc sous-estimée ; les taux mensuels sont fiables (octobre : 83,3 %). |
 
 ### Par plateforme (constaté)
 

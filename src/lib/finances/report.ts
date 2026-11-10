@@ -303,6 +303,8 @@ export function buildReport(input: ReportInput): Report {
       }
     }
 
+    const shares = allocate(r, input.mode).filter((s) => monthSet.has(s.month));
+    if (!shares.length) continue; // hors période pour ce mode
     const included = isIncluded(r, input.cancellations);
     if (r.status === "cancelled") {
       if (included) cancelledIncluded++;
@@ -310,7 +312,7 @@ export function buildReport(input: ReportInput): Report {
     }
     if (!included) continue;
 
-    for (const s of allocate(r, input.mode)) {
+    for (const s of shares) {
       if (!monthSet.has(s.month)) continue;
       usedGroups.add(group);
       for (const k of [`${group}|${s.month}`, `${group}|*`, `*|${s.month}`, "*|*", `ch:${r.channel}`]) bucket(k).add(s, r.id);
