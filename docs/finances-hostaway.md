@@ -29,10 +29,10 @@ Code : `src/lib/finances/mapping.ts` (testé dans `report.test.ts`).
 
 | Colonne | Formule | Remarques |
 | --- | --- | --- |
-| **Revenus de location** | `r.totalPrice − taxe de séjour` | Montant payé par le voyageur, hors taxe de séjour. Comprend le ménage, la TVA Booking, les frais voyageur Airbnb et les résolutions Airbnb (voir plus bas). |
+| **Revenus de location** | `r.totalPrice − résolutions Airbnb − taxe de séjour` | Montant payé par le voyageur, hors taxe de séjour. Comprend le ménage, la TVA Booking et les frais voyageur Airbnb. Les résolutions Airbnb ne sont **pas** déduites pour un séjour confirmé, comme dans le rapport Hostaway (vérifié au centime, voir plus bas). |
 | **Commissions plateforme** | `f.hostChannelFee` (à défaut `r.channelCommissionAmount`, puis `r.airbnbListingHostFee`) `+ f.guestChannelFee` | `r.channelCommissionAmount` est souvent vide pour Booking (9 réservations sur 19 en octobre) : `f.hostChannelFee` est fiable. |
 | **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee` | **Toujours vides sur ce compte** (0 réservation sur 750) → 0 €. Voir les questions ouvertes. |
-| **Versement total** | `revenus − commissions − frais de paiement` | Avant impôts. Égal à `f.airbnbPayoutSum` pour 500 réservations Airbnb confirmées sur 537 ; les 37 autres ont une résolution Airbnb. |
+| **Versement total** | `revenus − commissions − frais de paiement` | Avant impôts. Égal à `f.airbnbPayoutSum` pour 484 réservations Airbnb confirmées sur 537 ; les 53 autres ont une résolution Airbnb que Airbnb a déjà déduite de son versement (voir plus bas). |
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
 | **Ménage** | `f.cleaningFeeValue` (à défaut `r.cleaningFee`, puis `r.airbnbListingCleaningFee`) | Uniquement s'il a été facturé : 39 réservations sur 750. Sinon 0 €. Un frais par séjour, compté au mois d'arrivée. |
 | Séjours / nuits | `r.nights` (à défaut départ − arrivée) | |
@@ -42,6 +42,7 @@ Code : `src/lib/finances/mapping.ts` (testé dans `report.test.ts`).
 
 **Airbnb** (`airbnbOfficial`, canal 2018) — 670 réservations
 - `totalPrice = f.baseRate + f.cleaningFeeValue + f.guestChannelFee + f.priceForExtraPerson + f.salesTax + résolutions`
+- Résolutions (`f.airbnbClosedResolutionsSum`, `f.airbnbOpenResolutionsSum`) : toujours négatives (remboursements / retenues au détriment de l'hôte). Non déduites des revenus d'un séjour confirmé, comme le rapport Hostaway ; pour une annulation, la résolution est le montant conservé et reste comptée.
 - Commission = `f.hostChannelFee` (≈ 15,5 % du `baseRate`, identique à `r.airbnbListingHostFee`) + `f.guestChannelFee`
   (frais de service voyageur, présent sur 18 réservations : inclus dans `totalPrice` mais gardé par Airbnb).
 - Taxe de séjour = `f.airbnbTransientOccupancyTax` (= `r.airbnbTransientOccupancyTaxPaidAmount`). Airbnb la reverse
@@ -101,10 +102,13 @@ Par plateforme : Airbnb 98 séjours (versement 54 175,69 €), Booking 20 (9 753
 1. **Nombre de lignes** : 174 dans Hostaway contre 119 séjours ici. Le rapport Hostaway liste toutes les
    réservations, y compris les 28 demandes et refus et les 27 annulations sans versement ; le module ne
    compte que les séjours.
-2. **Résolutions Airbnb** (`f.airbnbClosedResolutionsSum` / `f.airbnbOpenResolutionsSum`) : −4 338,58 € sur
-   les séjours confirmés d'octobre. Hostaway les déduit de `totalPrice`, donc de nos revenus et de notre
-   versement, alors que `f.airbnbPayoutSum` ne les déduit pas (56 215,48 €). Sur tout l'historique,
-   37 réservations sont concernées (−8 021,36 €).
+2. **Résolutions Airbnb** : corrigé. Calage au centime sur le rapport Hostaway du 1er au 10/11/2026 (arrivées) :
+   **22 093,01 €** = somme des `totalPrice` des séjours confirmés **sans déduire les résolutions** (21 613,01 € +
+   480,00 €), taxe de séjour comprise. Le module affiche 19 849,26 € de revenus + 2 243,75 € de taxe de séjour =
+   22 093,01 €. Les résolutions ne sont donc plus déduites des séjours confirmés. Attention : Airbnb les retire
+   bien de ses versements, déjà fait pour 51 séjours anciens (juillet-août) et apparemment plus tard pour les
+   séjours récents. Au total, 89 séjours confirmés et −18 842,13 € de résolutions ne sont pas déduits.
+   `scripts/finances-resolutions.ts` en donne le détail.
 3. **Frais voyageur Airbnb** (`f.guestChannelFee`) : comptés en commission. Si le rapport Hostaway les met
    dans les revenus sans les déduire, son versement est plus élevé.
 4. **TVA Booking** : incluse dans les revenus. Un rapport « hors taxes » afficherait des revenus Booking plus

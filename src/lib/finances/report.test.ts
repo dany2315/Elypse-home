@@ -233,3 +233,22 @@ describe("intervalle de dates", () => {
     assert.equal(buildReport({ ...base, mode: "reservation", period: { from: "2026-09-15", to: "2026-09-15" } }).total.revenue, 30000);
   });
 });
+
+describe("mapFinance — résolutions Airbnb", () => {
+  it("séjour confirmé : résolution non déduite (comme Hostaway et airbnbPayoutSum)", () => {
+    // Cas réel : totalPrice 693,85 = 893,85 − 200 de résolution ; payout Airbnb 674,56.
+    const m = mapFinance(
+      { channelName: "airbnbOfficial", status: "new", totalPrice: 693.85 },
+      { hostChannelFee: 123.74, airbnbTransientOccupancyTax: 95.55, airbnbClosedResolutionsSum: -200, airbnbPayoutSum: 674.56 },
+    );
+    assert.equal(m.revenueCents, 79830);
+    assert.equal(m.payoutCents, 67456);
+  });
+  it("annulation : la résolution est le montant conservé", () => {
+    const m = mapFinance(
+      { channelName: "airbnbOfficial", status: "cancelled", totalPrice: 205.94 },
+      { airbnbClosedResolutionsSum: 205.94, airbnbPayoutSum: 205.94 },
+    );
+    assert.equal(m.payoutCents, 20594);
+  });
+});

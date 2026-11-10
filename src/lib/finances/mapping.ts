@@ -70,9 +70,17 @@ export function mapFinance(r: Obj, fin: Obj | null): FinanceAmounts {
   const paymentFees = PAYMENT_FEE_FIELDS.reduce((a, k) => a + num(f[k]), 0);
   const cleaning = firstNonZero(f.cleaningFeeValue, r.cleaningFee, r.airbnbListingCleaningFee);
 
+  // Résolutions Airbnb : Hostaway les retire de totalPrice, mais ni son rapport « Activité de
+  // location » ni le versement Airbnb (airbnbPayoutSum) ne les déduisent pour un séjour confirmé
+  // (vérifié au centime : 1er-10/11/2026). Pour une annulation, la résolution EST le montant
+  // conservé : on la garde.
+  const resolutions = (CONFIRMED_STATUSES as readonly string[]).includes(status)
+    ? num(f.airbnbClosedResolutionsSum) + num(f.airbnbOpenResolutionsSum)
+    : 0;
+
   const totalPriceCents = cents(totalPrice);
   const cityTaxCents = cents(cityTax);
-  const revenueCents = totalPriceCents - cityTaxCents;
+  const revenueCents = totalPriceCents - cents(resolutions) - cityTaxCents;
   const commissionCents = cents(commission);
   const paymentFeesCents = cents(paymentFees);
 
