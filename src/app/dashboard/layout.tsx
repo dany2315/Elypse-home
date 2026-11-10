@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Monogram } from "@/components/brand/logo";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { requireSession } from "@/lib/auth";
 
@@ -17,7 +18,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/dashbo
               <span className="block text-[10px] tracking-[0.3em] text-gold/80 uppercase">Livrets d&apos;accueil</span>
             </span>
           </Link>
-          <UserMenu email={session.user.email} />
+          <div className="flex items-center gap-2 sm:gap-4">
+            <DashboardNav />
+            <UserMenu email={session.user.email} />
+          </div>
         </div>
         <div className="gold-hairline h-px opacity-40" />
       </header>
