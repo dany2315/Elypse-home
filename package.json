@@ -13,7 +13,9 @@
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:import": "tsx --env-file=.env scripts/import-livrets.ts",
     "postinstall": "prisma generate",
-    "google:enrich": "tsx --env-file=.env scripts/google-enrich.ts"
+    "google:enrich": "tsx --env-file=.env scripts/google-enrich.ts",
+    "hostaway:sync": "tsx --env-file=.env scripts/hostaway-sync.ts",
+    "test": "tsx --test src/lib/finances/*.test.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
