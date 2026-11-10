@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/auth";
-import { csvAmount, parseFilters, periodLabel } from "@/lib/finances/filters";
+import { csvAmount, modeLabel, parseFilters, periodLabel, periodSlug } from "@/lib/finances/filters";
 import { loadReport } from "@/lib/finances/load";
-import { MODES, CANCEL_FILTERS, occupancy, type Totals } from "@/lib/finances/report";
+import { CANCEL_FILTERS, occupancy, type Totals } from "@/lib/finances/report";
 import { buildSections, type ViewSection } from "@/lib/finances/views";
 
 /** Export CSV de la vue affichée (mêmes filtres que /dashboard/finances). */
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
   const rows: string[][] = [
     ["Elypse Home — Finances", periodLabel(filters)],
-    ["Rattachement", MODES.find((m) => m.value === filters.mode)!.label],
+    ["Rattachement", modeLabel(filters.mode, filters.periode)],
     ["Annulations", CANCEL_FILTERS.find((c) => c.value === filters.annulations)!.label],
     [],
     ...main.flatMap(section),
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   ];
 
   const csv = "﻿" + rows.map((r) => r.map(escape).join(";")).join("\r\n");
-  const name = `finances-${filters.periode === "annee" ? filters.year : `${filters.year}-${String(filters.month).padStart(2, "0")}`}-${filters.mode}.csv`;
+  const name = `finances-${periodSlug(filters)}-${filters.mode}.csv`;
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

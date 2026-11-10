@@ -1,7 +1,7 @@
 /** Chargement des données Finances depuis la base (côté serveur, aucun appel Hostaway). */
 import { prisma } from "@/lib/db";
-import type { FinanceFilters } from "./filters";
-import { buildReport, periodMonths, type Report, type ReportBien } from "./report";
+import { toPeriod, type FinanceFilters } from "./filters";
+import { buildReport, periodRange, type Report, type ReportBien } from "./report";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
@@ -27,10 +27,10 @@ export async function loadGroups(): Promise<{ biens: ReportBien[]; listingNames:
 }
 
 export async function loadReport(f: FinanceFilters): Promise<Report> {
-  const months = periodMonths(f.periode === "annee" ? { year: f.year } : { year: f.year, month: f.month });
-  const start = new Date(`${months[0]}-01T00:00:00Z`);
-  const last = new Date(`${months[months.length - 1]}-01T00:00:00Z`);
-  const end = new Date(Date.UTC(last.getUTCFullYear(), last.getUTCMonth() + 1, 1));
+  const period = toPeriod(f);
+  const range = periodRange(period);
+  const start = new Date(`${range.start}T00:00:00Z`);
+  const end = new Date(`${range.end}T00:00:00Z`);
 
   const [{ biens, listingNames }, rows] = await Promise.all([
     loadGroups(),
@@ -75,7 +75,7 @@ export async function loadReport(f: FinanceFilters): Promise<Report> {
     })),
     biens,
     listingNames,
-    period: f.periode === "annee" ? { year: f.year } : { year: f.year, month: f.month },
+    period,
     mode: f.mode,
     cancellations: f.annulations,
     groupKey: f.bien === "tous" ? undefined : f.bien,

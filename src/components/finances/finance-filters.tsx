@@ -3,12 +3,19 @@
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { MONTH_NAMES, toSearchParams, type FinanceFilters } from "@/lib/finances/filters";
+import { modeLabel, MONTH_NAMES, toSearchParams, validDate, type FinanceFilters, type Periode } from "@/lib/finances/filters";
 import { CANCEL_FILTERS, MODES } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
+
+const PERIODES: { value: Periode; label: string }[] = [
+  { value: "mois", label: "Mois" },
+  { value: "annee", label: "Année" },
+  { value: "dates", label: "Dates" },
+];
 
 type Props = {
   filters: FinanceFilters;
@@ -31,7 +38,7 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
         <Field label="Période">
           <div className="inline-flex h-8 rounded-lg border border-input p-0.5">
-            {(["mois", "annee"] as const).map((p) => (
+            {PERIODES.map(({ value: p, label }) => (
               <button
                 key={p}
                 type="button"
@@ -41,7 +48,7 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
                   filters.periode === p ? "bg-ink text-ivory" : "text-ink/70 hover:bg-accent",
                 )}
               >
-                {p === "mois" ? "Mois" : "Année"}
+                {label}
               </button>
             ))}
           </div>
@@ -64,20 +71,47 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
           </Field>
         )}
 
-        <Field label="Année">
-          <Select value={String(filters.year)} onValueChange={(v) => update({ year: Number(v) })}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        {filters.periode !== "dates" && (
+          <Field label="Année">
+            <Select value={String(filters.year)} onValueChange={(v) => update({ year: Number(v) })}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
+
+        {filters.periode === "dates" && (
+          <>
+            <Field label="Du">
+              <Input
+                type="date"
+                value={filters.from}
+                max={filters.to}
+                onChange={(e) => validDate(e.target.value) && update({ from: e.target.value })}
+                className="h-8 w-40"
+                aria-label="Date de début (incluse)"
+              />
+            </Field>
+            <Field label="Au (inclus)">
+              <Input
+                type="date"
+                value={filters.to}
+                min={filters.from}
+                onChange={(e) => validDate(e.target.value) && update({ to: e.target.value })}
+                className="h-8 w-40"
+                aria-label="Date de fin (incluse)"
+              />
+            </Field>
+          </>
+        )}
 
         <Field label="Bien">
           <Select value={filters.bien} onValueChange={(v) => update({ bien: v })}>
@@ -95,7 +129,7 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
           </Select>
         </Field>
 
-        <Field label="Rattachement au mois">
+        <Field label="Rattachement">
           <Select value={filters.mode} onValueChange={(v) => update({ mode: v as FinanceFilters["mode"] })}>
             <SelectTrigger className="w-64">
               <SelectValue />
@@ -103,7 +137,7 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
             <SelectContent>
               {MODES.map((m) => (
                 <SelectItem key={m.value} value={m.value}>
-                  {m.label}
+                  {modeLabel(m.value, filters.periode)}
                 </SelectItem>
               ))}
             </SelectContent>

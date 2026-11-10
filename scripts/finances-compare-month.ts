@@ -35,7 +35,7 @@ async function main() {
   const payoutAirbnb = resolutions.reduce((a, r) => a + ((r.raw as { finance?: Record<string, number> | null }).finance?.airbnbPayoutSum ?? 0), 0);
 
   for (const annulations of ["versement", "toutes", "aucune"] as const) {
-    const r = await loadReport({ periode: "mois", year: y, month: m, bien: "tous", mode: "arrivee", annulations, occ: true });
+    const r = await loadReport({ periode: "mois", year: y, month: m, bien: "tous", mode: "arrivee", annulations, occ: true, from: "", to: "" });
     const t = r.total;
     console.log(
       `\nArrivées du mois, annulations=${annulations} : ${t.stays} séjours, ${t.nights} nuits, revenus ${eur(t.revenue)}, commissions ${eur(t.commission)}, frais ${eur(t.paymentFees)}, versement ${eur(t.payout)}, taxe de séjour ${eur(t.cityTax)}, ménage ${eur(t.cleaning)} (doublons ignorés : ${r.duplicates})`,

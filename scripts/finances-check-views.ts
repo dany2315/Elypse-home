@@ -12,7 +12,7 @@ async function main() {
   const year = Number(process.argv[2] ?? 2026);
   let ok = true;
   for (const mode of ["sejour", "arrivee", "reservation"] as const) {
-    const f = { periode: "annee" as const, year, month: 1, bien: "tous", mode, annulations: "versement" as const, occ: true };
+    const f = { periode: "annee" as const, year, month: 1, bien: "tous", mode, annulations: "versement" as const, occ: true, from: "", to: "" };
     const r = await loadReport(f);
     const sumMonths = Object.values(r.totalByMonth).reduce((a, t) => a + t.payout, 0);
     const sumRows = r.rows.reduce((a, t) => a + t.totals.payout, 0);

@@ -6,9 +6,8 @@ import { FinanceTable } from "@/components/finances/finance-table";
 import { SyncButton } from "@/components/finances/sync-button";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
-import { eur, parseFilters, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
+import { eur, modeLabel, parseFilters, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
 import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
-import { MODES } from "@/lib/finances/report";
 import { buildSections } from "@/lib/finances/views";
 
 export const metadata: Metadata = { title: "Finances" };
@@ -30,7 +29,6 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
     loadYears(Number(today.slice(0, 4))),
   ]);
   const { main, channels } = buildSections(report, filters);
-  const modeLabel = MODES.find((m) => m.value === filters.mode)?.label;
   const exportHref = `/dashboard/finances/export?${toSearchParams(filters)}`;
 
   return (
@@ -79,7 +77,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       </section>
 
       <p className="mt-6 text-sm text-muted-foreground">
-        <span className="font-medium text-ink first-letter:uppercase">{periodLabel(filters)}</span> · {modeLabel}
+        <span className="font-medium text-ink first-letter:uppercase">{periodLabel(filters)}</span> · {modeLabel(filters.mode, filters.periode)}
         {report.cancelledIncluded > 0 && ` · ${report.cancelledIncluded} annulation(s) incluse(s)`}
         {report.cancelledExcluded > 0 && ` · ${report.cancelledExcluded} annulation(s) exclue(s)`}
       </p>

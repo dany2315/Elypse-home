@@ -111,6 +111,13 @@ Par plateforme : Airbnb 98 séjours (versement 54 175,69 €), Booking 20 (9 753
    bas (environ −908 € en octobre).
 5. **Taxe de séjour Airbnb** : affichée dans la colonne taxe de séjour, alors qu'Airbnb la reverse lui-même.
 
+**Contrôle en direct** (`scripts/finances-verify-live.ts`, 10/11/2026) : les 174 réservations d'octobre sont
+relues dans Hostaway. Résultat : 0 absente, 0 statut différent et 0 écart de montant entre la base et l'API.
+Les écarts éventuels avec le rapport Hostaway tiennent donc aux **définitions** des colonnes, pas aux données.
+Séjours confirmés d'octobre : `totalPrice` 84 446,90 € · `baseRate` 77 184,62 € · ménage 800 € · commission hôte
+12 266,75 € · frais voyageur Airbnb 734,12 € · taxe de séjour 9 003,29 € · TVA Booking 923,45 € · résolutions
+−4 338,58 € · versement calculé 62 442,74 € (66 426,32 € avec les versements Airbnb réels `airbnbPayoutSum`).
+
 Les montants du rapport Hostaway ne sont pas lisibles par l'API : à comparer colonne par colonne avec
 l'export du rapport « Activité de location » (même mois, mêmes filtres de statut). Pour regénérer ces
 chiffres : `pnpm tsx --env-file=.env scripts/finances-compare-month.ts 2026-10`.

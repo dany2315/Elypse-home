@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { mapFinance } from "./mapping";
-import { allocate, buildReport, dedupe, nightsByMonth, type ReportReservation } from "./report";
+import { allocate, buildReport, dedupe, nightsByMonth, periodBuckets, type ReportReservation } from "./report";
 
 const resa = (o: Partial<ReportReservation> & { id: number }): ReportReservation => ({
   listingId: 1,
@@ -48,7 +48,7 @@ describe("nightsByMonth", () => {
 
 describe("allocate — séjours du mois", () => {
   it("répartit au prorata des nuits et met le ménage au mois d'arrivée", () => {
-    const [oct, nov] = allocate(cheval, "sejour");
+    const [oct, nov] = allocate(cheval, "sejour", periodBuckets({ year: 2026 }));
     // (300 − 60) € à la nuit = 80 €/nuit → oct : 2 × 80 + 60 ; nov : 80.
     assert.equal(oct.revenue, 22000);
     assert.equal(nov.revenue, 8000);
@@ -62,7 +62,7 @@ describe("allocate — séjours du mois", () => {
 
   it("garde des sommes exactes à l'arrondi", () => {
     const r = resa({ id: 11, arrival: "2026-10-31", departure: "2026-12-02", nights: 32, revenueCents: 10001, commissionCents: 333 });
-    const shares = allocate(r, "sejour");
+    const shares = allocate(r, "sejour", periodBuckets({ from: "2026-10-01", to: "2026-12-31" }));
     assert.equal(shares.reduce((a, s) => a + s.revenue, 0), 10001);
     assert.equal(shares.reduce((a, s) => a + s.commission, 0), 333);
     assert.equal(shares.reduce((a, s) => a + s.nights, 0), 32);
@@ -186,5 +186,50 @@ describe("mapFinance (champs Hostaway réels)", () => {
   it("ménage : montant réellement facturé, 0 sinon", () => {
     assert.equal(mapFinance({ channelName: "airbnbOfficial", status: "new", totalPrice: 500 }, { cleaningFeeValue: 200 }).cleaningFeeCents, 20000);
     assert.equal(mapFinance({ channelName: "airbnbOfficial", status: "new", totalPrice: 500 }, {}).cleaningFeeCents, 0);
+  });
+});
+
+describe("intervalle de dates", () => {
+  it("découpe en mois coupés aux bornes (bornes incluses)", () => {
+    const b = periodBuckets({ from: "2026-10-15", to: "2026-11-14" });
+    assert.deepEqual(
+      b.map((x) => [x.key, x.start, x.end, x.days, x.partial]),
+      [
+        ["2026-10", "2026-10-15", "2026-11-01", 17, true],
+        ["2026-11", "2026-11-01", "2026-11-15", 14, true],
+      ],
+    );
+    assert.equal(periodBuckets({ year: 2026, month: 2 })[0].days, 28);
+    assert.equal(periodBuckets({ year: 2026 }).length, 12);
+  });
+
+  it("séjours : prorata des nuits dans l'intervalle, ménage seulement si l'arrivée y est", () => {
+    const base = { reservations: [cheval], biens, mode: "sejour" as const, cancellations: "versement" as const };
+    // 31 oct → 1er nov : nuits du 31 oct et du 1er nov ; l'arrivée (30 oct) est hors intervalle.
+    const r = buildReport({ ...base, period: { from: "2026-10-31", to: "2026-11-01" } });
+    assert.equal(r.total.nights, 2);
+    assert.equal(r.total.cleaning, 0);
+    assert.equal(r.total.revenue, 16000); // 2 nuits × 80 €
+    assert.equal(r.total.occupiedNights, 2);
+    assert.equal(r.total.availableNights, 2);
+  });
+
+  it("deux intervalles adjacents redonnent exactement la réservation", () => {
+    const r = resa({ id: 40, arrival: "2026-10-03", departure: "2026-10-10", nights: 7, revenueCents: 70001, commissionCents: 1001, cityTaxCents: 333, cleaningFeeCents: 5000 });
+    const base = { reservations: [r], biens, mode: "sejour" as const, cancellations: "versement" as const };
+    const a = buildReport({ ...base, period: { from: "2026-10-01", to: "2026-10-05" } }).total;
+    const b = buildReport({ ...base, period: { from: "2026-10-06", to: "2026-10-31" } }).total;
+    assert.equal(a.revenue + b.revenue, 70001);
+    assert.equal(a.commission + b.commission, 1001);
+    assert.equal(a.cityTax + b.cityTax, 333);
+    assert.equal(a.nights + b.nights, 7);
+    assert.equal(a.cleaning, 5000);
+  });
+
+  it("arrivées et réservations : date dans l'intervalle", () => {
+    const base = { reservations: [cheval], biens, cancellations: "versement" as const };
+    assert.equal(buildReport({ ...base, mode: "arrivee", period: { from: "2026-10-30", to: "2026-10-30" } }).total.stays, 1);
+    assert.equal(buildReport({ ...base, mode: "arrivee", period: { from: "2026-10-31", to: "2026-11-30" } }).total.stays, 0);
+    assert.equal(buildReport({ ...base, mode: "reservation", period: { from: "2026-09-15", to: "2026-09-15" } }).total.revenue, 30000);
   });
 });

@@ -1,13 +1,17 @@
 /**
  * Calcul du récapitulatif financier (module pur : ni base, ni réseau, ni date courante).
  *
- * Rattachement au mois :
+ * Période : un mois, une année, ou un intervalle de dates (bornes incluses). Elle est
+ * découpée en tranches : les mois, coupés aux bornes de l'intervalle.
+ *
+ * Rattachement :
  *  - "sejour"      : montants à la nuit répartis au prorata des nuits passées dans chaque
- *                    mois ; ménage (montant par séjour) au mois d'arrivée ; séjours à venir inclus.
- *  - "arrivee"     : tout au mois d'arrivée.
- *  - "reservation" : tout au mois de la date de réservation.
- * Les montants sont en centimes ; la répartition utilise un arrondi cumulé pour que la
- * somme des mois redonne exactement le montant de la réservation.
+ *                    tranche ; ménage (montant par séjour) à la tranche du jour d'arrivée ;
+ *                    séjours à venir inclus.
+ *  - "arrivee"     : tout à la tranche du jour d'arrivée.
+ *  - "reservation" : tout à la tranche de la date de réservation.
+ * Montants en centimes. Le prorata est arrondi en cumulé depuis l'arrivée : la somme des
+ * tranches (et de périodes adjacentes) redonne exactement le montant de la réservation.
  */
 
 export type Mode = "sejour" | "arrivee" | "reservation";
@@ -48,7 +52,11 @@ export type ReportReservation = {
 
 export type ReportBien = { id: string; name: string; listingIds: number[] };
 
-export type Period = { year: number; month?: number };
+/** Mois (`month`), année entière, ou intervalle `from` → `to` (AAAA-MM-JJ, bornes incluses). */
+export type Period = { year: number; month?: number } | { from: string; to: string };
+
+/** Tranche de la période : [start, end[ (AAAA-MM-JJ). `key` = AAAA-MM. */
+export type Bucket = { key: string; start: string; end: string; days: number; partial: boolean };
 
 export type Totals = {
   revenue: number;
@@ -68,7 +76,7 @@ export type Totals = {
 export type ReportRow = { key: string; name: string; totals: Totals; byMonth: Record<string, Totals> };
 
 export type Report = {
-  months: string[];
+  buckets: Bucket[];
   rows: ReportRow[];
   total: Totals;
   totalByMonth: Record<string, Totals>;
@@ -97,37 +105,49 @@ const DAY = 86_400_000;
 /* --------------------------------- Dates --------------------------------- */
 
 const toUtc = (d: string) => Date.parse(`${d.slice(0, 10)}T00:00:00Z`);
+const fromUtc = (t: number) => new Date(t).toISOString().slice(0, 10);
+const addDays = (d: string, n: number) => fromUtc(toUtc(d) + n * DAY);
+const daysBetween = (a: string, b: string) => Math.round((toUtc(b) - toUtc(a)) / DAY);
 export const monthKey = (d: string) => d.slice(0, 7);
-const monthStart = (key: string) => Date.parse(`${key}-01T00:00:00Z`);
-const nextMonth = (key: string) => {
-  const [y, m] = key.split("-").map(Number);
-  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+const nextMonthStart = (d: string) => {
+  const [y, m] = d.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
 };
-const daysInMonth = (key: string) => Math.round((monthStart(nextMonth(key)) - monthStart(key)) / DAY);
 
-export function periodMonths(p: Period): string[] {
-  if (p.month) return [`${p.year}-${String(p.month).padStart(2, "0")}`];
-  return Array.from({ length: 12 }, (_, i) => `${p.year}-${String(i + 1).padStart(2, "0")}`);
+/** Bornes [début, fin[ de la période. */
+export function periodRange(p: Period): { start: string; end: string } {
+  if ("from" in p) return { start: p.from, end: addDays(p.to, 1) };
+  if (p.month) {
+    const start = `${p.year}-${String(p.month).padStart(2, "0")}-01`;
+    return { start, end: nextMonthStart(start) };
+  }
+  return { start: `${p.year}-01-01`, end: `${p.year + 1}-01-01` };
+}
+
+/** Découpe la période en mois, coupés aux bornes. */
+export function periodBuckets(p: Period): Bucket[] {
+  const { start, end } = periodRange(p);
+  const out: Bucket[] = [];
+  for (let s = start; s < end; ) {
+    const monthEnd = nextMonthStart(s);
+    const e = monthEnd < end ? monthEnd : end;
+    out.push({ key: monthKey(s), start: s, end: e, days: daysBetween(s, e), partial: s.slice(8) !== "01" || e !== monthEnd });
+    s = e;
+  }
+  return out;
 }
 
 /** Nuits de [arrivée, départ[ passées dans chaque mois. */
 export function nightsByMonth(arrival: string, departure: string): Map<string, number> {
   const out = new Map<string, number>();
-  const a = toUtc(arrival);
-  const d = toUtc(departure);
-  for (let key = monthKey(arrival); monthStart(key) < d; key = nextMonth(key)) {
-    const from = Math.max(a, monthStart(key));
-    const to = Math.min(d, monthStart(nextMonth(key)));
-    const n = Math.round((to - from) / DAY);
-    if (n > 0) out.set(key, n);
-  }
+  for (const b of periodBuckets({ from: arrival, to: addDays(departure, -1) })) out.set(b.key, b.days);
   return out;
 }
 
 /* ------------------------------ Répartition ------------------------------ */
 
 type Share = {
-  month: string;
+  bucket: string;
   revenue: number;
   commission: number;
   paymentFees: number;
@@ -136,61 +156,63 @@ type Share = {
   nights: number;
 };
 
-/** Répartit `amount` selon des poids, avec arrondi cumulé (somme exacte). */
-function split(amount: number, weights: number[]): number[] {
-  const total = weights.reduce((a, b) => a + b, 0);
-  if (total === 0) return weights.map((_, i) => (i === 0 ? amount : 0));
-  let cum = 0;
-  let prev = 0;
-  return weights.map((w) => {
-    cum += w;
-    const next = Math.round((amount * cum) / total);
-    const part = next - prev;
-    prev = next;
-    return part;
-  });
-}
+const bucketOf = (buckets: Bucket[], date: string) => buckets.find((b) => date >= b.start && date < b.end);
 
-export function allocate(r: ReportReservation, mode: Mode): Share[] {
-  const whole = (month: string): Share[] => [
-    {
-      month,
-      revenue: r.revenueCents,
-      commission: r.commissionCents,
-      paymentFees: r.paymentFeesCents,
-      cityTax: r.cityTaxCents,
-      cleaning: r.cleaningFeeCents,
-      nights: r.nights,
-    },
-  ];
-  if (mode === "arrivee") return whole(monthKey(r.arrival));
-  if (mode === "reservation") return whole(monthKey(r.reservationDate ?? r.arrival));
+/** Part de `amount` pour les nuits [offset, offset + n[ d'un séjour de `total` nuits (arrondi cumulé). */
+const slice = (amount: number, offset: number, n: number, total: number) =>
+  Math.round((amount * (offset + n)) / total) - Math.round((amount * offset) / total);
 
-  const byMonth = nightsByMonth(r.arrival, r.departure);
-  if (byMonth.size <= 1) return whole(monthKey(r.arrival));
+/** Répartit une réservation dans les tranches (celles hors période sont ignorées). */
+export function allocate(r: ReportReservation, mode: Mode, buckets: Bucket[]): Share[] {
+  const whole = (date: string): Share[] => {
+    const b = bucketOf(buckets, date);
+    if (!b) return [];
+    return [
+      {
+        bucket: b.key,
+        revenue: r.revenueCents,
+        commission: r.commissionCents,
+        paymentFees: r.paymentFeesCents,
+        cityTax: r.cityTaxCents,
+        cleaning: r.cleaningFeeCents,
+        nights: r.nights,
+      },
+    ];
+  };
+  if (mode === "arrivee") return whole(r.arrival);
+  if (mode === "reservation") return whole(r.reservationDate ?? r.arrival);
 
-  const months = [...byMonth.keys()];
-  const weights = months.map((m) => byMonth.get(m)!);
-  // Le ménage (montant par séjour) va au mois d'arrivée ; le reste des revenus est réparti à la nuit.
-  const nightlyRevenue = split(r.revenueCents - r.cleaningFeeCents, weights);
-  const commission = split(r.commissionCents, weights);
-  const paymentFees = split(r.paymentFeesCents, weights);
-  const cityTax = split(r.cityTaxCents, weights);
-  const arrivalMonth = monthKey(r.arrival);
-  return months.map((month, i) => ({
-    month,
-    revenue: nightlyRevenue[i] + (month === arrivalMonth ? r.cleaningFeeCents : 0),
-    commission: commission[i],
-    paymentFees: paymentFees[i],
-    cityTax: cityTax[i],
-    cleaning: month === arrivalMonth ? r.cleaningFeeCents : 0,
-    nights: weights[i],
-  }));
+  const total = daysBetween(r.arrival, r.departure);
+  if (total <= 0) return whole(r.arrival);
+
+  // Le ménage (montant par séjour) va à la tranche d'arrivée ; le reste des revenus est réparti à la nuit.
+  const nightlyRevenue = r.revenueCents - r.cleaningFeeCents;
+  const arrivalBucket = bucketOf(buckets, r.arrival)?.key;
+  const shares: Share[] = [];
+  for (const b of buckets) {
+    const from = r.arrival > b.start ? r.arrival : b.start;
+    const to = r.departure < b.end ? r.departure : b.end;
+    const n = daysBetween(from, to);
+    if (n <= 0) continue;
+    const offset = daysBetween(r.arrival, from);
+    const cleaning = b.key === arrivalBucket ? r.cleaningFeeCents : 0;
+    shares.push({
+      bucket: b.key,
+      revenue: slice(nightlyRevenue, offset, n, total) + cleaning,
+      commission: slice(r.commissionCents, offset, n, total),
+      paymentFees: slice(r.paymentFeesCents, offset, n, total),
+      cityTax: slice(r.cityTaxCents, offset, n, total),
+      cleaning,
+      nights: n,
+    });
+  }
+  // Séjour qui ne fait qu'arriver dans la période sans y passer de nuit : rien à compter.
+  return shares;
 }
 
 /* -------------------------------- Agrégats -------------------------------- */
 
-class Bucket {
+class Acc {
   revenue = 0;
   commission = 0;
   paymentFees = 0;
@@ -228,7 +250,7 @@ class Bucket {
 }
 
 export function emptyTotals(): Totals {
-  return new Bucket().totals(0);
+  return new Acc().totals(0);
 }
 
 /** Garde une seule réservation par référence plateforme (préférence : confirmée, puis id le plus récent). */
@@ -264,8 +286,8 @@ export function isIncluded(r: ReportReservation, filter: CancelFilter): boolean 
 }
 
 export function buildReport(input: ReportInput): Report {
-  const months = periodMonths(input.period);
-  const monthSet = new Set(months);
+  const buckets = periodBuckets(input.period);
+  const occupancyBuckets = buckets;
 
   // Groupes : biens, puis listings non rattachés.
   const groupOfListing = new Map<number, string>();
@@ -283,8 +305,8 @@ export function buildReport(input: ReportInput): Report {
   };
 
   const { kept, duplicates } = dedupe(input.reservations);
-  const buckets = new Map<string, Bucket>();
-  const bucket = (k: string) => buckets.get(k) ?? buckets.set(k, new Bucket()).get(k)!;
+  const accs = new Map<string, Acc>();
+  const acc = (k: string) => accs.get(k) ?? accs.set(k, new Acc()).get(k)!;
   const usedGroups = new Set<string>(input.biens.map((b) => b.id));
 
   let cancelledIncluded = 0;
@@ -296,14 +318,14 @@ export function buildReport(input: ReportInput): Report {
 
     // Occupation (calendrier) : séjours confirmés uniquement, quel que soit le mode.
     if (CONFIRMED.has(r.status)) {
-      for (const [m, n] of nightsByMonth(r.arrival, r.departure)) {
-        if (!monthSet.has(m)) continue;
+      for (const s of allocate(r, "sejour", occupancyBuckets)) {
+        if (s.nights <= 0) continue;
         usedGroups.add(group);
-        for (const k of [`${group}|${m}`, `${group}|*`, `*|${m}`, "*|*"]) bucket(k).occupiedNights += n;
+        for (const k of [`${group}|${s.bucket}`, `${group}|*`, `*|${s.bucket}`, "*|*"]) acc(k).occupiedNights += s.nights;
       }
     }
 
-    const shares = allocate(r, input.mode).filter((s) => monthSet.has(s.month));
+    const shares = allocate(r, input.mode, buckets);
     if (!shares.length) continue; // hors période pour ce mode
     const included = isIncluded(r, input.cancellations);
     if (r.status === "cancelled") {
@@ -313,15 +335,14 @@ export function buildReport(input: ReportInput): Report {
     if (!included) continue;
 
     for (const s of shares) {
-      if (!monthSet.has(s.month)) continue;
       usedGroups.add(group);
-      for (const k of [`${group}|${s.month}`, `${group}|*`, `*|${s.month}`, "*|*", `ch:${r.channel}`]) bucket(k).add(s, r.id);
+      for (const k of [`${group}|${s.bucket}`, `${group}|*`, `*|${s.bucket}`, "*|*", `ch:${r.channel}`]) acc(k).add(s, r.id);
     }
   }
 
-  const days = months.reduce((a, m) => a + daysInMonth(m), 0);
+  const days = buckets.reduce((a, b) => a + b.days, 0);
   const groups = [...usedGroups].filter((g) => !input.groupKey || g === input.groupKey);
-  const get = (k: string, available: number) => (buckets.get(k) ?? new Bucket()).totals(available);
+  const get = (k: string, available: number) => (accs.get(k) ?? new Acc()).totals(available);
 
   const order = new Map(input.biens.map((b, i) => [b.id, i]));
   const rows: ReportRow[] = groups
@@ -329,20 +350,20 @@ export function buildReport(input: ReportInput): Report {
       key: g,
       name: groupNames.get(g) ?? g,
       totals: get(`${g}|*`, days),
-      byMonth: Object.fromEntries(months.map((m) => [m, get(`${g}|${m}`, daysInMonth(m))])),
+      byMonth: Object.fromEntries(buckets.map((b) => [b.key, get(`${g}|${b.key}`, b.days)])),
     }))
     .sort((a, b) => (order.get(a.key) ?? 1e9) - (order.get(b.key) ?? 1e9) || a.name.localeCompare(b.name, "fr"));
 
-  const byChannel = [...buckets.keys()]
+  const byChannel = [...accs.keys()]
     .filter((k) => k.startsWith("ch:"))
     .map((k) => ({ channel: k.slice(3), totals: get(k, 0) }))
     .sort((a, b) => b.totals.revenue - a.totals.revenue);
 
   return {
-    months,
+    buckets,
     rows,
     total: get("*|*", days * groups.length),
-    totalByMonth: Object.fromEntries(months.map((m) => [m, get(`*|${m}`, daysInMonth(m) * groups.length)])),
+    totalByMonth: Object.fromEntries(buckets.map((b) => [b.key, get(`*|${b.key}`, b.days * groups.length)])),
     byChannel,
     duplicates,
     cancelledIncluded,
