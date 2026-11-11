@@ -1,6 +1,7 @@
 import { Building2, Download, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RankedBars, ShareBar, TrendChart } from "@/components/finances/finance-charts";
 import { FinanceFiltersBar } from "@/components/finances/finance-filters";
 import { FinanceTable } from "@/components/finances/finance-table";
 import { SyncButton } from "@/components/finances/sync-button";
@@ -8,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { eur, modeLabel, parseFilters, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
 import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
+import { bienBars, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
 import { buildSections } from "@/lib/finances/views";
 
 export const metadata: Metadata = { title: "Finances" };
@@ -22,13 +24,16 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
   const today = todayInParis();
   const filters = parseFilters(await props.searchParams, today);
 
-  const [report, groups, sync, years] = await Promise.all([
+  const trend = trendFilters(filters);
+  const [report, trendReport, groups, sync, years] = await Promise.all([
     loadReport(filters),
+    trend ? loadReport(trend.filters) : null,
     loadGroups(),
     loadSyncState(),
     loadYears(Number(today.slice(0, 4))),
   ]);
   const { main, channels } = buildSections(report, filters);
+  const points = trendPoints(trendReport ?? report, trend?.highlight);
   const exportHref = `/dashboard/finances/export?${toSearchParams(filters)}`;
 
   return (
@@ -86,6 +91,24 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           <TriangleAlert className="size-4" /> {report.duplicates} réservation(s) en double ignorée(s) (même référence plateforme).
         </p>
       )}
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-5">
+        <TrendChart
+          className="lg:col-span-5"
+          title={trend ? "Évolution sur 12 mois" : "Évolution mois par mois"}
+          subtitle="Payé par les voyageurs = versement + commissions et frais + taxe de séjour. Survolez une colonne pour le détail."
+          points={points}
+        />
+        {filters.bien === "tous" && (
+          <RankedBars className="lg:col-span-3" title="Versement par bien" subtitle={periodLabel(filters)} items={bienBars(report)} />
+        )}
+        <ShareBar
+          className={filters.bien === "tous" ? "lg:col-span-2" : "lg:col-span-5"}
+          title="Revenus par plateforme"
+          subtitle="Part des revenus de location"
+          items={channelShares(report)}
+        />
+      </div>
 
       {main.map((s) => (
         <section key={s.id} className="mt-6">
