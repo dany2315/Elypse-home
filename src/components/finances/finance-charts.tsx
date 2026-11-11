@@ -50,13 +50,13 @@ function Card({ title, subtitle, children, className }: { title: string; subtitl
   return (
     <section
       className={cn(
-        "rounded-3xl border border-border/80 bg-card p-5 shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)] sm:p-6",
+        "min-w-0 rounded-3xl border border-border/80 bg-card p-4 shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)] sm:p-6",
         className,
       )}
     >
       <h2 className="font-serif text-2xl leading-tight text-ink">{title}</h2>
       {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
-      <div className="mt-5">{children}</div>
+      <div className="mt-4 sm:mt-5">{children}</div>
     </section>
   );
 }
@@ -98,7 +98,8 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
   return (
     <Card title={title} subtitle={subtitle} className={className}>
       <Legend />
-      <div ref={frame} className="relative mt-4" onPointerLeave={() => setTip(null)}>
+      <MobileTrend points={points} totals={totals} />
+      <div ref={frame} className="relative mt-7 hidden sm:block" onPointerLeave={() => setTip(null)}>
         <div className="flex">
           {/* Axe des valeurs */}
           <div className="relative mr-2 w-14 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums" style={{ height: H }}>
@@ -201,6 +202,64 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
   );
 }
 
+/** Mobile : un mois par ligne, barre empilée horizontale ; toucher une ligne affiche le détail. */
+function MobileTrend({ points, totals }: { points: TrendPoint[]; totals: number[] }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const max = Math.max(1, ...totals);
+  return (
+    <ul className="mt-4 space-y-1.5 sm:hidden">
+      {points.map((p, i) => {
+        const segments = SERIES.map((s) => ({ ...s, value: p[s.key] })).filter((s) => s.value > 0);
+        const expanded = open === p.key;
+        return (
+          <li key={p.key}>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              onClick={() => setOpen(expanded ? null : p.key)}
+              className="grid w-full grid-cols-[3.25rem_minmax(0,1fr)_4.25rem] items-center gap-2 rounded-lg py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-gold/60"
+            >
+              <span className={cn("truncate text-xs capitalize", p.highlight ? "font-semibold text-ink" : "text-muted-foreground")}>
+                {p.shortLabel}
+              </span>
+              <span className="flex h-3.5 min-w-0 gap-[2px]" style={{ width: `${(totals[i] / max) * 100}%` }} aria-hidden>
+                {segments.map((s, j) => (
+                  <span
+                    key={s.key}
+                    className={cn("h-full", j === segments.length - 1 && "rounded-r-[4px]")}
+                    style={{ background: s.color, flexGrow: s.value, flexBasis: 0, minWidth: 1 }}
+                  />
+                ))}
+              </span>
+              <span className={cn("text-right text-xs tabular-nums", p.highlight ? "font-semibold text-ink" : "text-ink/80")}>
+                {totals[i] > 0 ? eurCompact(totals[i]) : "—"}
+              </span>
+            </button>
+            {expanded && (
+              <div className="mt-1 mb-2 ml-[3.75rem] rounded-xl border border-border bg-card px-3 py-2.5 text-xs">
+                <p className="font-medium text-ink first-letter:uppercase">{p.label}</p>
+                <p className="mt-0.5 text-muted-foreground">
+                  {p.stays} séjour{p.stays > 1 ? "s" : ""} · payé par les voyageurs{" "}
+                  <span className="font-semibold text-ink tabular-nums">{eur(totals[i])}</span>
+                </p>
+                <ul className="mt-1.5 space-y-1">
+                  {SERIES.map((s) => (
+                    <li key={s.key} className="flex items-center gap-2">
+                      <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
+                      <span className="font-semibold text-ink tabular-nums">{eur(p[s.key])}</span>
+                      <span className="truncate text-muted-foreground">{s.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /* ----------------------- Barres horizontales classées ---------------------- */
 
 export function RankedBars({ items, title, subtitle, className }: { items: BarItem[]; title: string; subtitle?: string; className?: string }) {
@@ -222,14 +281,16 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
               onPointerLeave={() => setHover(null)}
               onFocus={() => setHover(i.key)}
               onBlur={() => setHover(null)}
-              className="grid grid-cols-[minmax(0,9rem)_1fr] items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-gold/60 sm:grid-cols-[minmax(0,11rem)_1fr]"
+              className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-gold/60 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]"
             >
               <span className="truncate text-sm text-ink/85">{i.label}</span>
-              <span className="flex items-center gap-2">
-                <span
-                  className="h-3.5 rounded-r-[4px] transition-[filter]"
-                  style={{ width: `${(i.value / max) * 82}%`, background: SERIES[0].color, filter: hover === i.key ? "brightness(1.12)" : undefined }}
-                />
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="min-w-0 flex-1">
+                  <span
+                    className="block h-3.5 rounded-r-[4px] transition-[filter]"
+                    style={{ width: `${(i.value / max) * 100}%`, background: SERIES[0].color, filter: hover === i.key ? "brightness(1.12)" : undefined }}
+                  />
+                </span>
                 <span className="text-xs font-semibold whitespace-nowrap text-ink tabular-nums">{eurCompact(i.value)}</span>
                 {hover === i.key && i.detail && (
                   <span className="hidden text-xs whitespace-nowrap text-muted-foreground lg:inline">· {i.detail}</span>
