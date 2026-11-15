@@ -9,6 +9,7 @@ export type ChartTrendPoint = {
   payout: number;
   fees: number;
   refunds: number;
+  taxes: number;
   stays: number;
   highlight?: boolean;
 };
@@ -46,6 +47,7 @@ export function trendPoints(report: Report, highlight: string[] = []): ChartTren
       payout: t.payout,
       fees: t.commission + t.paymentFees,
       refunds: t.refunds,
+      taxes: t.cityTax + t.vat,
       stays: t.stays,
       highlight: highlight.includes(b.key),
     };
@@ -62,5 +64,5 @@ export function bienBars(report: Report) {
 }
 
 export function channelShares(report: Report) {
-  return report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.totals.revenue }));
+  return report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.totals.gross }));
 }

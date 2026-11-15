@@ -84,6 +84,11 @@ describe("buildReport", () => {
     assert.equal(year.total.revenue, 30000);
     assert.equal(year.total.payout, 26700);
     assert.equal(year.total.cityTax, 1500);
+    // Chiffre d'affaires = ce que le voyageur a payé, taxes comprises ; bénéfice = CA − tout ce qui sort.
+    assert.equal(year.total.gross, 31500);
+    const t = year.total;
+    assert.equal(t.gross - t.commission - t.paymentFees - t.refunds - t.cityTax - t.vat, t.payout);
+    assert.equal(oct.total.gross + nov.total.gross, 31500);
     assert.equal(year.total.stays, 1, "un séjour sur deux mois n'est compté qu'une fois sur l'année");
     assert.equal(year.totalByMonth["2026-10"].revenue, 22000);
     assert.equal(year.totalByMonth["2026-11"].revenue, 8000);

@@ -17,16 +17,50 @@
 export type Mode = "sejour" | "arrivee" | "reservation";
 export type CancelFilter = "versement" | "toutes" | "aucune";
 
-export const MODES: { value: Mode; label: string }[] = [
-  { value: "sejour", label: "Séjours du mois" },
-  { value: "arrivee", label: "Arrivées du mois" },
-  { value: "reservation", label: "Réservations faites dans le mois" },
+/**
+ * Libellés pour l'utilisateur : `label` = bouton, `summary` = rappel sous les KPI et dans l'export,
+ * `hint` = explication affichée sous le filtre.
+ */
+export const MODES: { value: Mode; label: string; summary: string; hint: string }[] = [
+  {
+    value: "sejour",
+    label: "Nuits passées",
+    summary: "séjours comptés selon les nuits passées dans le mois",
+    hint: "Chaque mois reçoit la part du séjour correspondant aux nuits passées dedans : un séjour du 29 octobre au 3 novembre compte 3 nuits en octobre et 2 en novembre, et son montant est partagé pareil. Le ménage compte au mois d'arrivée.",
+  },
+  {
+    value: "arrivee",
+    label: "Date d'arrivée",
+    summary: "séjours comptés au mois d'arrivée",
+    hint: "Tout le séjour (nuits et montants) compte dans le mois où le voyageur arrive, même s'il repart le mois suivant. C'est le réglage « Arrivée » du rapport Hostaway : à choisir pour comparer avec lui.",
+  },
+  {
+    value: "reservation",
+    label: "Date de réservation",
+    summary: "séjours comptés au mois où ils ont été réservés",
+    hint: "Tout le séjour compte le jour où le voyageur a réservé, même s'il vient des mois plus tard. Utile pour suivre les ventes, pas l'activité.",
+  },
 ];
 
-export const CANCEL_FILTERS: { value: CancelFilter; label: string }[] = [
-  { value: "versement", label: "Annulations avec versement" },
-  { value: "toutes", label: "Inclure toutes les annulations" },
-  { value: "aucune", label: "Exclure les annulations" },
+export const CANCEL_FILTERS: { value: CancelFilter; label: string; summary: string; hint: string }[] = [
+  {
+    value: "versement",
+    label: "Si elles rapportent",
+    summary: "annulations comptées seulement si elles rapportent",
+    hint: "Une réservation annulée compte seulement si la plateforme vous verse quelque chose (frais d'annulation retenus au voyageur). Les annulations gratuites sont ignorées. Recommandé.",
+  },
+  {
+    value: "toutes",
+    label: "Toutes",
+    summary: "toutes les annulations comptées",
+    hint: "Toutes les réservations annulées comptent, même celles qui ne rapportent rien : elles s'ajoutent au nombre de séjours et de nuits.",
+  },
+  {
+    value: "aucune",
+    label: "Aucune",
+    summary: "annulations non comptées",
+    hint: "Les réservations annulées sont ignorées, même si la plateforme vous a versé des frais d'annulation.",
+  },
 ];
 
 export type ReportReservation = {
@@ -63,13 +97,21 @@ export type Period = { year: number; month?: number } | { from: string; to: stri
 export type Bucket = { key: string; start: string; end: string; days: number; partial: boolean };
 
 export type Totals = {
-  /** Chiffre d'affaires (Rental Revenue). */
+  /**
+   * Chiffre d'affaires : tout ce que les voyageurs ont payé (nuitées, ménage, frais de service,
+   * taxes) = Revenus de location Hostaway. = revenue + cityTax + vat.
+   */
+  gross: number;
+  /** Chiffre d'affaires hors taxes (taxe de séjour et TVA retirées). */
   revenue: number;
   commission: number;
   paymentFees: number;
   /** Remboursements aux voyageurs. */
   refunds: number;
-  /** Revenu net = CA − commissions − frais de paiement − remboursements. */
+  /**
+   * Bénéfice : ce qui reste réellement = CA − commissions − frais de paiement − remboursements
+   * − taxe de séjour − TVA (= CA hors taxes − commissions − frais de paiement − remboursements).
+   */
   payout: number;
   cityTax: number;
   /** TVA et autres taxes. */
@@ -254,6 +296,7 @@ class Acc {
 
   totals(availableNights: number): Totals {
     return {
+      gross: this.revenue + this.cityTax + this.vat,
       revenue: this.revenue,
       commission: this.commission,
       paymentFees: this.paymentFees,
@@ -379,7 +422,7 @@ export function buildReport(input: ReportInput): Report {
   const byChannel = [...accs.keys()]
     .filter((k) => k.startsWith("ch:"))
     .map((k) => ({ channel: k.slice(3), totals: get(k, 0) }))
-    .sort((a, b) => b.totals.revenue - a.totals.revenue);
+    .sort((a, b) => b.totals.gross - a.totals.gross);
 
   return {
     buckets,

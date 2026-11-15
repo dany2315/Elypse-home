@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/auth";
-import { csvAmount, modeLabel, parseFilters, periodLabel, periodSlug } from "@/lib/finances/filters";
+import { cancelLabel, csvAmount, modeLabel, parseFilters, periodLabel, periodSlug } from "@/lib/finances/filters";
 import { loadReport } from "@/lib/finances/load";
-import { CANCEL_FILTERS, occupancy, type Totals } from "@/lib/finances/report";
+import { occupancy, type Totals } from "@/lib/finances/report";
 import { buildSections, type ViewSection } from "@/lib/finances/views";
 
 /** Export CSV de la vue affichée (mêmes filtres que /dashboard/finances). */
@@ -14,29 +14,29 @@ export async function GET(request: Request) {
   const header = [
     "Séjours",
     "Nuits",
-    ...(filters.occ ? ["Occupation (%)"] : []),
+    "Occupation (%)",
     "Chiffre d'affaires (€)",
     "dont ménage (€)",
     "Commissions (€)",
     "Frais de paiement (€)",
     "Remboursements (€)",
-    "Revenu net (€)",
     "Taxe de séjour (€)",
     "TVA (€)",
+    "Bénéfice (€)",
   ];
   const line = (label: string, t: Totals) => [
     label,
     String(t.stays),
     String(t.nights),
-    ...(filters.occ ? [occupancy(t) === null ? "" : (occupancy(t)! * 100).toFixed(1).replace(".", ",")] : []),
-    csvAmount(t.revenue),
+    occupancy(t) === null ? "" : (occupancy(t)! * 100).toFixed(1).replace(".", ","),
+    csvAmount(t.gross),
     csvAmount(t.cleaning),
     csvAmount(t.commission),
     csvAmount(t.paymentFees),
     csvAmount(t.refunds),
-    csvAmount(t.payout),
     csvAmount(t.cityTax),
     csvAmount(t.vat),
+    csvAmount(t.payout),
   ];
   const section = (s: ViewSection) => [
     [s.title],
@@ -49,7 +49,8 @@ export async function GET(request: Request) {
   const rows: string[][] = [
     ["Elypse Home — Finances", periodLabel(filters)],
     ["Rattachement", modeLabel(filters.mode, filters.periode)],
-    ["Annulations", CANCEL_FILTERS.find((c) => c.value === filters.annulations)!.label],
+    ["Annulations", cancelLabel(filters.annulations)],
+    ["Bénéfice", "Chiffre d'affaires − commissions − frais de paiement − remboursements − taxe de séjour − TVA"],
     [],
     ...main.flatMap(section),
     ...section({ ...channels, total: channels.total }),

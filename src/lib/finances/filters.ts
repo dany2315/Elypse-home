@@ -14,8 +14,6 @@ export type FinanceFilters = {
   bien: string;
   mode: Mode;
   annulations: CancelFilter;
-  /** Afficher l'occupation. */
-  occ: boolean;
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -61,7 +59,6 @@ export function parseFilters(sp: SearchParams, today = todayInParis()): FinanceF
     bien: one(sp.bien) || "tous",
     mode: MODES.some((m) => m.value === mode) ? (mode as Mode) : "sejour",
     annulations: CANCEL_FILTERS.some((c) => c.value === annulations) ? (annulations as CancelFilter) : "versement",
-    occ: one(sp.occ) === "1",
   };
 }
 
@@ -77,17 +74,16 @@ export function toSearchParams(f: FinanceFilters): URLSearchParams {
   if (f.bien !== "tous") p.set("bien", f.bien);
   if (f.mode !== "sejour") p.set("mode", f.mode);
   if (f.annulations !== "versement") p.set("annulations", f.annulations);
-  if (f.occ) p.set("occ", "1");
   return p;
 }
 
 export const toPeriod = (f: FinanceFilters): Period =>
   f.periode === "dates" ? { from: f.from, to: f.to } : f.periode === "annee" ? { year: f.year } : { year: f.year, month: f.month };
 
-/** Libellé du mode adapté à la période (« du mois » ou « de la période »). */
+/** Rappel du mode de rattachement (ex. « séjours comptés au mois d'arrivée »). */
 export function modeLabel(mode: Mode, periode: Periode): string {
-  const label = MODES.find((m) => m.value === mode)!.label;
-  return periode === "mois" ? label : label.replace("dans le mois", "dans la période").replace("du mois", "de la période");
+  const label = MODES.find((m) => m.value === mode)!.summary;
+  return periode === "mois" ? label : label.replace("dans le mois", "dans la période").replace("au mois", "à la date");
 }
 
 /* -------------------------------- Formatage ------------------------------- */
@@ -148,3 +144,6 @@ export function periodSlug(f: FinanceFilters): string {
 
 /** Montant CSV : 1234,56 (sans séparateur de milliers, pour les tableurs). */
 export const csvAmount = (cents: number) => (cents / 100).toFixed(2).replace(".", ",");
+
+/** Rappel du filtre des annulations. */
+export const cancelLabel = (c: CancelFilter) => CANCEL_FILTERS.find((x) => x.value === c)!.summary;

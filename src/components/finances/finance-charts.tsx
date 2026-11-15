@@ -5,6 +5,7 @@
  * Palette validée (scripts/validate_palette.js du skill dataviz, fond #ffffff, paires adjacentes) :
  * bleu #3a5bc7 · or #c9a45c · violet #7a6fd6. L'or est sous 3:1 de contraste : les valeurs
  * restent lisibles par les étiquettes, les infobulles et les tableaux de la page.
+ * Taxes en gris neutre #a9aebd : elles ne sont pas à vous (reversées à la ville / l'État).
  * L'app n'a pas de thème sombre : seul le mode clair est défini.
  */
 import { useId, useRef, useState } from "react";
@@ -17,6 +18,7 @@ export type TrendPoint = {
   payout: number;
   fees: number;
   refunds: number;
+  taxes: number;
   stays: number;
   highlight?: boolean;
 };
@@ -24,9 +26,10 @@ export type BarItem = { key: string; label: string; value: number; detail?: stri
 export type ShareItem = { key: string; label: string; value: number };
 
 const SERIES = [
-  { key: "payout", label: "Revenu net", color: "#3a5bc7", ink: "#ffffff" },
+  { key: "payout", label: "Bénéfice", color: "#3a5bc7", ink: "#ffffff" },
   { key: "fees", label: "Commissions et frais", color: "#c9a45c", ink: "#12162a" },
   { key: "refunds", label: "Remboursements", color: "#7a6fd6", ink: "#ffffff" },
+  { key: "taxes", label: "Taxes (séjour, TVA)", color: "#a9aebd", ink: "#12162a" },
 ] as const;
 
 const eurFmt = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
@@ -82,7 +85,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
   const [tip, setTip] = useState<Tip>(null);
   const frame = useRef<HTMLDivElement>(null);
   const id = useId();
-  const totals = points.map((p) => p.payout + p.fees + p.refunds);
+  const totals = points.map((p) => p.payout + p.fees + p.refunds + p.taxes);
   const ticks = niceTicks(Math.max(0, ...totals));
   const top = ticks[ticks.length - 1] || 1;
   const maxIndex = totals.indexOf(Math.max(...totals));
@@ -130,7 +133,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
                     role="listitem"
                     tabIndex={0}
                     aria-describedby={tip?.point.key === p.key ? `${id}-tip` : undefined}
-                    aria-label={`${p.label} : chiffre d'affaires ${eur(p.payout + p.fees + p.refunds)}, revenu net ${eur(p.payout)}, commissions et frais ${eur(p.fees)}, remboursements ${eur(p.refunds)}`}
+                    aria-label={`${p.label} : chiffre d'affaires ${eur(total)}, bénéfice ${eur(p.payout)}, commissions et frais ${eur(p.fees)}, remboursements ${eur(p.refunds)}, taxes ${eur(p.taxes)}`}
                     onPointerEnter={(e) => show(e, p)}
                     onFocus={(e) => show(e, p)}
                     onBlur={() => setTip(null)}
@@ -184,7 +187,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
             <p className="font-medium text-ink first-letter:uppercase">{tip.point.label}</p>
             <p className="mt-0.5 text-muted-foreground">
               {tip.point.stays} séjour{tip.point.stays > 1 ? "s" : ""} · chiffre d&apos;affaires{" "}
-              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.payout + tip.point.fees + tip.point.refunds)}</span>
+              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.payout + tip.point.fees + tip.point.refunds + tip.point.taxes)}</span>
             </p>
             <ul className="mt-2 space-y-1">
               {[...SERIES].reverse().map((s) => (
@@ -307,6 +310,7 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
 /* --------------------------- Barre segmentée haute -------------------------- */
 
 const SHARE_COLORS = [SERIES[0], SERIES[1], SERIES[2]];
+
 
 export function ShareBar({ items, title, subtitle, className }: { items: ShareItem[]; title: string; subtitle?: string; className?: string }) {
   const parts = items.filter((i) => i.value > 0).slice(0, 3);

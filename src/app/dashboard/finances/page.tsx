@@ -7,7 +7,8 @@ import { FinanceTable } from "@/components/finances/finance-table";
 import { SyncButton } from "@/components/finances/sync-button";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
-import { eur, modeLabel, parseFilters, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
+import { cancelLabel, eur, int, modeLabel, parseFilters, pct, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
+import { occupancy } from "@/lib/finances/report";
 import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
 import { bienBars, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
 import { buildSections } from "@/lib/finances/views";
@@ -75,20 +76,32 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
 
       <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Chiffre d'affaires" value={eur(report.total.gross)} note="Tout ce que les voyageurs ont payé" />
         <Kpi
-          label="Chiffre d'affaires"
-          value={eur(report.total.revenue)}
-          note={`Taxes comprises (comme Hostaway) : ${eur(report.total.revenue + report.total.cityTax + report.total.vat)}`}
+          label="Commissions et frais"
+          value={`− ${eur(report.total.commission + report.total.paymentFees + report.total.refunds)}`}
+          note={`Commissions ${eur(report.total.commission)} · paiement ${eur(report.total.paymentFees)} · remboursements ${eur(report.total.refunds)}`}
         />
-        <Kpi label="Commissions, frais et remboursements" value={eur(report.total.commission + report.total.paymentFees + report.total.refunds)} />
-        <Kpi label="Frais de ménage" value={eur(report.total.cleaning)} />
-        <Kpi label="Revenu net (bénéfice)" value={eur(report.total.payout)} accent />
+        <Kpi
+          label="Taxes à reverser"
+          value={`− ${eur(report.total.cityTax + report.total.vat)}`}
+          note={`Taxe de séjour ${eur(report.total.cityTax)} · TVA ${eur(report.total.vat)}`}
+        />
+        <Kpi label="Bénéfice" value={eur(report.total.payout)} note="Ce qui reste réellement pour vous" accent />
+      </section>
+
+      <section className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Stat label="Frais de ménage" value={eur(report.total.cleaning)} note="payés par les voyageurs" />
+        <Stat label="Remboursements" value={eur(report.total.refunds)} note="rendus aux voyageurs" />
+        <Stat label="Séjours" value={int(report.total.stays)} />
+        <Stat label="Nuitées" value={int(report.total.nights)} />
+        <Stat label="Occupation" value={pct(occupancy(report.total))} note="nuits occupées / nuits disponibles" />
       </section>
 
       <p className="mt-6 text-sm text-muted-foreground">
-        <span className="font-medium text-ink first-letter:uppercase">{periodLabel(filters)}</span> · {modeLabel(filters.mode, filters.periode)}
-        {report.cancelledIncluded > 0 && ` · ${report.cancelledIncluded} annulation(s) incluse(s)`}
-        {report.cancelledExcluded > 0 && ` · ${report.cancelledExcluded} annulation(s) exclue(s)`}
+        <span className="font-medium text-ink first-letter:uppercase">{periodLabel(filters)}</span> · {modeLabel(filters.mode, filters.periode)} ·{" "}
+        {cancelLabel(filters.annulations)}
+        {cancelCounts(report.cancelledIncluded, report.cancelledExcluded)}
       </p>
       {report.duplicates > 0 && (
         <p className="mt-2 flex items-center gap-2 text-sm text-gold-deep">
@@ -100,11 +113,11 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         <TrendChart
           className="lg:col-span-5"
           title={trend ? "Évolution sur 12 mois" : "Évolution mois par mois"}
-          subtitle="Hauteur = chiffre d'affaires, découpé en revenu net + commissions et frais + remboursements. Survolez une colonne pour le détail."
+          subtitle="Hauteur = chiffre d'affaires, découpé en bénéfice + commissions et frais + remboursements + taxes. Survolez une colonne pour le détail."
           points={points}
         />
         {filters.bien === "tous" && (
-          <RankedBars className="lg:col-span-3" title="Revenu net par bien" subtitle={periodLabel(filters)} items={bienBars(report)} />
+          <RankedBars className="lg:col-span-3" title="Bénéfice par bien" subtitle={periodLabel(filters)} items={bienBars(report)} />
         )}
         <ShareBar
           className={filters.bien === "tous" ? "lg:col-span-2" : "lg:col-span-5"}
@@ -117,7 +130,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       {main.map((s) => (
         <section key={s.id} className="mt-6">
           <h2 className="mb-3 font-serif text-2xl text-ink">{s.title}</h2>
-          <FinanceTable firstColumn={s.firstColumn} rows={s.rows} total={s.total} showOccupancy={filters.occ} />
+          <FinanceTable firstColumn={s.firstColumn} rows={s.rows} total={s.total} />
         </section>
       ))}
 
@@ -131,13 +144,32 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       </section>
 
       <p className="mt-8 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-        Chiffre d&apos;affaires (Rental Revenue Hostaway) : nuitées + ménage + frais de service voyageur + suppléments, hors
-        taxes et avant toute déduction. Revenu net = chiffre d&apos;affaires − commissions − frais de paiement −
-        remboursements ; c&apos;est le bénéfice avant les charges non saisies ici (coût du ménage, frais de gestion…).
-        Taxe de séjour et TVA sont collectées en plus du chiffre d&apos;affaires. Ménage : uniquement le montant facturé dans
-        la réservation Hostaway. Occupation : nuits occupées / nuits du calendrier (nuits bloquées non déduites).
+        Chiffre d&apos;affaires : tout ce que les voyageurs ont payé (nuitées, ménage, frais de service, taxe de séjour,
+        TVA), comme les « Revenus de location » Hostaway. Bénéfice = chiffre d&apos;affaires − commissions − frais de
+        paiement − remboursements − taxe de séjour − TVA : ce qui vous reste, avant vos propres charges (coût du ménage,
+        loyer, gestion…), qui ne sont pas dans Hostaway. Les frais de ménage sont payés par les voyageurs et restent dans
+        le bénéfice. Occupation : nuits occupées / nuits du calendrier (nuits bloquées non déduites).
       </p>
     </main>
+  );
+}
+
+/** « (2 comptées, 5 ignorées) » pour les annulations de la période. */
+function cancelCounts(included: number, excluded: number) {
+  const parts = [
+    included > 0 && `${included} comptée${included > 1 ? "s" : ""}`,
+    excluded > 0 && `${excluded} ignorée${excluded > 1 ? "s" : ""}`,
+  ].filter(Boolean);
+  return parts.length ? ` (${parts.join(", ")})` : "";
+}
+
+function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3">
+      <p className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">{label}</p>
+      <p className="mt-1 text-xl text-ink tabular-nums">{value}</p>
+      {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
+    </div>
   );
 }
 

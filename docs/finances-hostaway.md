@@ -22,23 +22,35 @@ personnelle.
 - Le détail n'est lu que pour les séjours (`new`, `modified`, et `cancelled` avec `totalPrice` ≠ 0),
   puis relu seulement quand `updatedOn` change. Synchro complète ≈ 2 min ; synchro nocturne ≈ 15 s.
 
+## Filtres « Dans quel mois compter un séjour ? » et « Réservations annulées »
+
+Chaque option affiche sous le filtre une phrase qui explique son effet (`MODES` et `CANCEL_FILTERS` dans `report.ts`) :
+
+- **Nuits passées** (par défaut) : un séjour à cheval sur deux mois est partagé selon les nuits de chaque mois ; ménage au mois d'arrivée.
+- **Date d'arrivée** : tout le séjour compte au mois d'arrivée (réglage « Arrivée » du rapport Hostaway, pour comparer).
+- **Date de réservation** : tout le séjour compte au mois où il a été réservé (suivi des ventes).
+- Annulations **Si elles rapportent** (par défaut) : comptées seulement si la plateforme verse quelque chose ; **Toutes** ; **Aucune**.
+
 ## Colonnes → champs
 
 Notation : `r.` = champ de la réservation, `f.` = champ de `/financeStandardField`.
 Code : `src/lib/finances/mapping.ts` (testé dans `report.test.ts`).
 
+Lecture de l'écran (demande d'Elypse, 16/11/2026) : **chiffre d'affaires** = tout ce que les voyageurs ont payé ; puis chaque montant qui en sort (commissions, frais de paiement, remboursements, taxe de séjour, TVA) ; **bénéfice** = ce qui reste réellement. Le ménage payé par les voyageurs est affiché à part (« dont ménage ») et reste dans le bénéfice. Occupation, séjours et nuitées sont toujours affichés.
+
 | Colonne | Formule | Remarques |
 | --- | --- | --- |
-| **Chiffre d'affaires** (Rental Revenue) | `r.totalPrice − taxe de séjour − TVA + remboursements` | Définition Hostaway (Financial Reporting) : nuitées + ménage + frais de service voyageur + suppléments, hors taxes, avant toute déduction. Partir de `totalPrice` capte aussi les suppléments. |
+| **Chiffre d'affaires** (champ `gross`) | `CA hors taxes + taxe de séjour + TVA` = `r.totalPrice + remboursements` | Tout ce que les voyageurs ont payé = « Revenus de location » du rapport Hostaway (vérifié au centime : 28 362,43 € du 1er au 15/11, par arrivée). |
+| CA hors taxes (champ `revenue`, calcul interne) | `r.totalPrice − taxe de séjour − TVA + remboursements` | Rental Revenue au sens Hostaway (Financial Reporting) : nuitées + ménage + frais de service voyageur + suppléments. Sert de base au prorata. |
 | **Commissions plateforme** | `f.hostChannelFee` (à défaut `r.channelCommissionAmount`, puis `r.airbnbListingHostFee`) `+ f.guestChannelFee` | `r.channelCommissionAmount` est souvent vide pour Booking (9 réservations sur 19 en octobre) : `f.hostChannelFee` est fiable. |
 | **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee`, à défaut **1,4 % du `totalPrice` pour Booking** | Les champs Hostaway sont toujours vides ; le taux de 1,4 % est le réglage « Frais de traitement du paiement OTA » du compte Hostaway, absent de l'API (vérifié au centime : 1 162,44 € → 16,27 €). Constante `BOOKING_PAYMENT_FEE_RATE` dans `mapping.ts`. |
 | **Remboursements** | `−(f.airbnbClosedResolutionsSum + f.airbnbOpenResolutionsSum)` (séjours confirmés) | Résolutions Airbnb (remboursements aux voyageurs). Hostaway les retire de `totalPrice` : on les rajoute au CA puis on les déduit du revenu net. Pour une annulation, la résolution est le montant conservé et reste dans le CA. |
-| **Revenu net (bénéfice)** | `CA − commissions − frais de paiement − remboursements` | « Revenu net » Hostaway : ce qui est réellement reçu. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. Bénéfice **avant** les charges non saisies ici (coût du ménage, frais de gestion Elypse…). |
+| **Bénéfice** (champ `payout`) | `CA − commissions − frais de paiement − remboursements − taxe de séjour − TVA` | Ce qui reste réellement : ce qui est reçu des plateformes, taxes à reverser retirées. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. Bénéfice **avant** les charges non saisies ici (coût du ménage, frais de gestion Elypse…). |
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
 | **TVA** | `f.vat + f.otherTaxes + f.roomTax + f.lodgingTax + f.hotelTax` (+ `f.salesTax` hors Airbnb) | Collectée en plus du CA (Booking, 10 % sur certains listings). |
 | **dont ménage** | `f.cleaningFeeValue` (à défaut `r.cleaningFee`, puis `r.airbnbListingCleaningFee`) | Inclus dans le CA. Uniquement s'il a été facturé : 39 réservations sur 750. Sinon 0 €. Un frais par séjour, compté au mois d'arrivée. |
 | Séjours / nuits | `r.nights` (à défaut départ − arrivée) | |
-| Occupation | nuits occupées / nuits du calendrier × biens | Option (interrupteur « Occupation »). Les nuits bloquées ne sont pas déduites, car l'API calendrier n'est pas lue. Toute l'année compte, y compris les mois d'avant la mise en location (janvier-mars 2026) : l'occupation annuelle 2026 (35,9 %) est donc sous-estimée ; les taux mensuels sont fiables (octobre : 83,3 %). |
+| Occupation | nuits occupées / nuits du calendrier × biens | Toujours affichée. Les nuits bloquées ne sont pas déduites, car l'API calendrier n'est pas lue. Toute l'année compte, y compris les mois d'avant la mise en location (janvier-mars 2026) : l'occupation annuelle 2026 (35,9 %) est donc sous-estimée ; les taux mensuels sont fiables (octobre : 83,3 %). |
 
 ### Par plateforme (constaté)
 

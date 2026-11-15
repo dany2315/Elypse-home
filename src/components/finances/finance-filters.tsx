@@ -6,8 +6,7 @@ import { useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { modeLabel, MONTH_NAMES, toSearchParams, validDate, type FinanceFilters, type Periode } from "@/lib/finances/filters";
+import { MONTH_NAMES, toSearchParams, validDate, type FinanceFilters, type Periode } from "@/lib/finances/filters";
 import { CANCEL_FILTERS, MODES } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
 
@@ -129,47 +128,62 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
           </Select>
         </Field>
 
-        <Field label="Rattachement">
-          <Select value={filters.mode} onValueChange={(v) => update({ mode: v as FinanceFilters["mode"] })}>
-            <SelectTrigger className="w-64">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MODES.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {modeLabel(m.value, filters.periode)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <Field label="Annulations">
-          <Select
-            value={filters.annulations}
-            onValueChange={(v) => update({ annulations: v as FinanceFilters["annulations"] })}
-          >
-            <SelectTrigger className="w-60">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CANCEL_FILTERS.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-
-        <label className="flex h-8 cursor-pointer items-center gap-2 text-sm text-ink/80">
-          <Switch checked={filters.occ} onCheckedChange={(v) => update({ occ: v })} />
-          Occupation
-        </label>
-
         {pending && <Loader2 className="mb-2 size-4 animate-spin text-gold-deep" aria-label="Chargement" />}
       </div>
+
+      <div className="mt-4 grid gap-4 border-t border-border/70 pt-4 lg:grid-cols-2 lg:gap-6">
+        <Choice
+          title="Dans quel mois compter un séjour ?"
+          options={MODES}
+          value={filters.mode}
+          onChange={(mode) => update({ mode })}
+        />
+        <Choice
+          title="Réservations annulées"
+          options={CANCEL_FILTERS}
+          value={filters.annulations}
+          onChange={(annulations) => update({ annulations })}
+        />
+      </div>
     </div>
+  );
+}
+
+/** Choix expliqué : boutons, puis une phrase qui dit ce que fait l'option active. */
+function Choice<T extends string>({
+  title,
+  options,
+  value,
+  onChange,
+}: {
+  title: string;
+  options: { value: T; label: string; hint: string }[];
+  value: T;
+  onChange: (v: T) => void;
+}) {
+  const active = options.find((o) => o.value === value) ?? options[0];
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">{title}</legend>
+      <div className="mt-1.5 grid grid-cols-3 rounded-lg border border-input p-0.5" role="radiogroup" aria-label={title}>
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={o.value === value}
+            onClick={() => onChange(o.value)}
+            className={cn(
+              "min-h-8 rounded-md px-2 py-1 text-xs leading-tight font-medium transition sm:text-sm",
+              o.value === value ? "bg-ink text-ivory" : "text-ink/70 hover:bg-accent",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{active.hint}</p>
+    </fieldset>
   );
 }
 
