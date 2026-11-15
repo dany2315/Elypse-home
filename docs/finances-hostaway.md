@@ -166,6 +166,16 @@ Les montants du rapport Hostaway ne sont pas lisibles par l'API : à comparer co
 l'export du rapport « Activité de location » (même mois, mêmes filtres de statut). Pour regénérer ces
 chiffres : `pnpm tsx --env-file=.env scripts/finances-compare-month.ts 2026-10`.
 
+## Coût du ménage (17/11/2026)
+
+Demande : déduire du bénéfice le coût du ménage payé par Elypse. Recherche dans l'API Hostaway (lecture seule, `scripts/hostaway-explore-cleaning-cost.ts`) :
+
+- `/expenses` (dépenses), `/tasks` (tâches de ménage), `/ownerStatements`, `/listingFeeSettings/{id}` : **vides** ;
+- fiche des listings : seul `cleaningFee` existe, c'est le ménage **facturé au voyageur** (200 € sur Le Miromesnil, 0 ailleurs), pas un coût ;
+- réservations et détail financier : aucun champ de coût de ménage.
+
+Aucun coût de ménage n'est donc renseigné dans Hostaway à ce jour. Dès qu'il sera saisi comme dépense Hostaway (Dépenses et extras, y compris par règle automatique à chaque départ), il remontera par `/expenses` et pourra être déduit du bénéfice.
+
 ## Questions ouvertes pour l'équipe
 
 - **Mode de rattachement par défaut** : « Séjours du mois » (actuel) ou « Arrivées du mois », comme le rapport Hostaway ?
