@@ -31,7 +31,7 @@ Code : `src/lib/finances/mapping.ts` (testé dans `report.test.ts`).
 | --- | --- | --- |
 | **Chiffre d'affaires** (Rental Revenue) | `r.totalPrice − taxe de séjour − TVA + remboursements` | Définition Hostaway (Financial Reporting) : nuitées + ménage + frais de service voyageur + suppléments, hors taxes, avant toute déduction. Partir de `totalPrice` capte aussi les suppléments. |
 | **Commissions plateforme** | `f.hostChannelFee` (à défaut `r.channelCommissionAmount`, puis `r.airbnbListingHostFee`) `+ f.guestChannelFee` | `r.channelCommissionAmount` est souvent vide pour Booking (9 réservations sur 19 en octobre) : `f.hostChannelFee` est fiable. |
-| **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee` | **Toujours vides sur ce compte** (0 réservation sur 750) → 0 €. Voir les questions ouvertes. |
+| **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee`, à défaut **1,4 % du `totalPrice` pour Booking** | Les champs Hostaway sont toujours vides ; le taux de 1,4 % est le réglage « Frais de traitement du paiement OTA » du compte Hostaway, absent de l'API (vérifié au centime : 1 162,44 € → 16,27 €). Constante `BOOKING_PAYMENT_FEE_RATE` dans `mapping.ts`. |
 | **Remboursements** | `−(f.airbnbClosedResolutionsSum + f.airbnbOpenResolutionsSum)` (séjours confirmés) | Résolutions Airbnb (remboursements aux voyageurs). Hostaway les retire de `totalPrice` : on les rajoute au CA puis on les déduit du revenu net. Pour une annulation, la résolution est le montant conservé et reste dans le CA. |
 | **Revenu net (bénéfice)** | `CA − commissions − frais de paiement − remboursements` | « Revenu net » Hostaway : ce qui est réellement reçu. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. Bénéfice **avant** les charges non saisies ici (coût du ménage, frais de gestion Elypse…). |
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
@@ -88,6 +88,26 @@ téléphone, adresse, carte ou code d'accès n'est conservé (`sanitizeReservati
 Source : réponse de Hostaway à Elypse (Financial Reporting → Financial Settings). **Rental Revenue** = tarif par nuitée + ménage + frais de service voyageur + suppléments, avant toute déduction. **Revenu net** = ce qui est reçu après commissions OTA, frais de paiement, taxes et remboursements.
 
 Contrôle du 1er au 10/11/2026 (arrivées, 34 séjours) : CA 19 750,65 € + taxe de séjour 2 243,75 € + TVA 98,61 € = **22 093,01 €**, le chiffre du rapport Hostaway (taxes comprises). Commissions 2 853,00 € · remboursements 480,00 € · **revenu net 16 417,65 €**. Octobre (arrivées, 119 séjours) : CA 81 380,44 € · commissions 13 578,78 € · remboursements 4 338,58 € · revenu net 63 463,08 € · taxe de séjour 9 187,85 € · TVA 923,45 €. `scripts/finances-summary.ts` recalcule ces chiffres pour n'importe quelle période.
+
+## Rapprochement du profit net Hostaway (15/11/2026)
+
+Formules Hostaway (Rapports financiers → Paramètres financiers) : **Profit net = Versement total − Loyer** (loyer = 0).
+Versement total Airbnb = somme des versements Airbnb + somme des résolutions fermées. Versement total Booking =
+**Total payé** − frais de canal de l'hôte − frais de paiement − taxe de ville. Revenus de location = prix total du canal.
+
+Rapport « Activité de location », 1er-15/11/2026, par arrivée (`scripts/finances-match-hostaway.ts`) :
+
+- Revenus de location : **identiques au centime** sur les 10 biens (28 362,43 €).
+- Profit net : **identique au centime** pour Le Vaneau, Le Bosquet, Le Amelot 62, Le Bartholdi et Saint martin.
+- Écarts restants, tous expliqués :
+  1. **TVA Booking** (Le Amelot 157 75,82 €, 101 rue Nollet 12,39 €, La Sourdière 42,48 €) : Hostaway ne la déduit pas.
+     Le module la sort du bénéfice, car elle est due à l'État.
+  2. **Le Toudic, 150 €** : double comptage dans la formule Hostaway. Pour la réservation #71026339, Airbnb a déjà
+     retiré la résolution de 150 € de son versement (234,44 € → 84,44 €), et Hostaway la retire une deuxième fois.
+     Le module retient 84,44 €, ce qu'Airbnb verse réellement.
+  3. **Le Miromesnil, réservation Booking #66454347 (3 308,80 €)** : aucun paiement enregistré dans Hostaway (statut
+     « Unknown ») et aucune commission. Le « Total payé » vaut 0, donc le profit Hostaway vaut 0. Le module compte la
+     réservation (3 262,48 € après frais de paiement) mais sans commission Booking : **à corriger dans Hostaway**.
 
 ## Vérification — octobre 2026, « Arrivées du mois »
 

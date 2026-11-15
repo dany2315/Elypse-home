@@ -54,6 +54,14 @@ const OTHER_TAX_FIELDS = ["vat", "otherTaxes", "roomTax", "lodgingTax", "hotelTa
 const PAYMENT_FEE_FIELDS = ["paymentServiceProcessingFees", "bookingcomPaymentProcessingFee"] as const;
 
 /**
+ * Frais de paiement Booking (« Frais de traitement du paiement OTA ») : 1,4 % du prix total.
+ * Réglage du compte Hostaway (paramètres de canaux), absent de l'API : vérifié au centime
+ * sur le rapport « Activité de location » du 1er au 15/11/2026 (ex. 1 162,44 € → 16,27 €).
+ * Utilisé seulement si Hostaway ne fournit pas lui-même les frais de paiement.
+ */
+export const BOOKING_PAYMENT_FEE_RATE = 0.014;
+
+/**
  * Définitions Hostaway (Financial Reporting) :
  *  - Chiffre d'affaires (Rental Revenue) = nuitées + ménage + frais de service voyageur + suppléments,
  *    avant toute déduction, hors taxes. Calculé comme totalPrice − taxes + remboursements, ce qui
@@ -86,7 +94,8 @@ export function mapFinance(r: Obj, fin: Obj | null): FinanceAmounts {
   // dans le CA) mais la plateforme les garde.
   const commission =
     firstNonZero(f.hostChannelFee, r.channelCommissionAmount, isAirbnb ? r.airbnbListingHostFee : 0) + num(f.guestChannelFee);
-  const paymentFees = sum(f, PAYMENT_FEE_FIELDS);
+  const isBooking = String(r.channelName ?? "") === "bookingcom";
+  const paymentFees = sum(f, PAYMENT_FEE_FIELDS) || (isBooking ? totalPrice * BOOKING_PAYMENT_FEE_RATE : 0);
   const cleaning = firstNonZero(f.cleaningFeeValue, r.cleaningFee, r.airbnbListingCleaningFee);
 
   // Résolutions Airbnb (toujours négatives : remboursements aux voyageurs). Hostaway les retire

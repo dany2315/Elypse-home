@@ -175,7 +175,8 @@ describe("mapFinance (champs Hostaway réels)", () => {
     assert.equal(m.vatCents, 4328);
     assert.equal(m.revenueCents, 43282); // = baseRate
     assert.equal(m.commissionCents, 8094);
-    assert.equal(m.payoutCents, 35188);
+    assert.equal(m.paymentFeesCents, 749); // 1,4 % de 534,71 €
+    assert.equal(m.payoutCents, 34439);
   });
 
   it("annulation sans montant conservé : tout à zéro", () => {
@@ -277,5 +278,20 @@ describe("revenu net et remboursements dans le récapitulatif", () => {
     const half = buildReport({ ...base, period: { from: "2026-10-31", to: "2026-10-31" } }).total;
     assert.equal(half.refunds, 5000);
     assert.equal(half.payout, 12000);
+  });
+});
+
+describe("mapFinance — frais de paiement Booking (cas réel Le Amelot 62)", () => {
+  it("1,4 % du prix total, comme Hostaway", () => {
+    const m = mapFinance(
+      { channelName: "bookingcom", status: "new", totalPrice: 1162.44 },
+      { hostChannelFee: 175.96, baseRate: 1035.04, cityTax: 127.4 },
+    );
+    assert.equal(m.paymentFeesCents, 1627);
+    assert.equal(m.payoutCents, 84281); // = profit Hostaway de cette réservation
+  });
+  it("frais fournis par Hostaway : ils priment", () => {
+    const m = mapFinance({ channelName: "bookingcom", status: "new", totalPrice: 1000 }, { bookingcomPaymentProcessingFee: 12, hostChannelFee: 150 });
+    assert.equal(m.paymentFeesCents, 1200);
   });
 });
