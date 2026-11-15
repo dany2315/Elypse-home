@@ -15,12 +15,14 @@ export async function GET(request: Request) {
     "Séjours",
     "Nuits",
     ...(filters.occ ? ["Occupation (%)"] : []),
-    "Revenus de location (€)",
+    "Chiffre d'affaires (€)",
+    "dont ménage (€)",
     "Commissions (€)",
     "Frais de paiement (€)",
-    "Versement total (€)",
+    "Remboursements (€)",
+    "Revenu net (€)",
     "Taxe de séjour (€)",
-    "Ménage (€)",
+    "TVA (€)",
   ];
   const line = (label: string, t: Totals) => [
     label,
@@ -28,11 +30,13 @@ export async function GET(request: Request) {
     String(t.nights),
     ...(filters.occ ? [occupancy(t) === null ? "" : (occupancy(t)! * 100).toFixed(1).replace(".", ",")] : []),
     csvAmount(t.revenue),
+    csvAmount(t.cleaning),
     csvAmount(t.commission),
     csvAmount(t.paymentFees),
+    csvAmount(t.refunds),
     csvAmount(t.payout),
     csvAmount(t.cityTax),
-    csvAmount(t.cleaning),
+    csvAmount(t.vat),
   ];
   const section = (s: ViewSection) => [
     [s.title],

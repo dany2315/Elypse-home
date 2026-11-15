@@ -75,10 +75,10 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
 
       <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Revenus de location" value={eur(report.total.revenue)} />
-        <Kpi label="Commissions et frais" value={eur(report.total.commission + report.total.paymentFees)} />
-        <Kpi label="Versement total" value={eur(report.total.payout)} accent />
-        <Kpi label="Taxe de séjour" value={eur(report.total.cityTax)} />
+        <Kpi label="Chiffre d'affaires" value={eur(report.total.revenue)} />
+        <Kpi label="Commissions, frais et remboursements" value={eur(report.total.commission + report.total.paymentFees + report.total.refunds)} />
+        <Kpi label="Frais de ménage" value={eur(report.total.cleaning)} />
+        <Kpi label="Revenu net (bénéfice)" value={eur(report.total.payout)} accent />
       </section>
 
       <p className="mt-6 text-sm text-muted-foreground">
@@ -96,16 +96,16 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         <TrendChart
           className="lg:col-span-5"
           title={trend ? "Évolution sur 12 mois" : "Évolution mois par mois"}
-          subtitle="Payé par les voyageurs = versement + commissions et frais + taxe de séjour. Survolez une colonne pour le détail."
+          subtitle="Hauteur = chiffre d'affaires, découpé en revenu net + commissions et frais + remboursements. Survolez une colonne pour le détail."
           points={points}
         />
         {filters.bien === "tous" && (
-          <RankedBars className="lg:col-span-3" title="Versement par bien" subtitle={periodLabel(filters)} items={bienBars(report)} />
+          <RankedBars className="lg:col-span-3" title="Revenu net par bien" subtitle={periodLabel(filters)} items={bienBars(report)} />
         )}
         <ShareBar
           className={filters.bien === "tous" ? "lg:col-span-2" : "lg:col-span-5"}
-          title="Revenus par plateforme"
-          subtitle="Part des revenus de location"
+          title="Chiffre d'affaires par plateforme"
+          subtitle="Part du chiffre d'affaires"
           items={channelShares(report)}
         />
       </div>
@@ -127,9 +127,11 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       </section>
 
       <p className="mt-8 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-        Revenus de location : montant payé par le voyageur, hors taxe de séjour. Versement total = revenus − commissions −
-        frais de paiement, avant impôts. Ménage : uniquement le montant présent dans la réservation Hostaway. Occupation :
-        nuits occupées / nuits du calendrier (les nuits bloquées ne sont pas déduites).
+        Chiffre d&apos;affaires (Rental Revenue Hostaway) : nuitées + ménage + frais de service voyageur + suppléments, hors
+        taxes et avant toute déduction. Revenu net = chiffre d&apos;affaires − commissions − frais de paiement −
+        remboursements ; c&apos;est le bénéfice avant les charges non saisies ici (coût du ménage, frais de gestion…).
+        Taxe de séjour et TVA sont collectées en plus du chiffre d&apos;affaires. Ménage : uniquement le montant facturé dans
+        la réservation Hostaway. Occupation : nuits occupées / nuits du calendrier (nuits bloquées non déduites).
       </p>
     </main>
   );

@@ -6,11 +6,17 @@
 type Obj = Record<string, unknown>;
 
 export type FinanceAmounts = {
+  /** Chiffre d'affaires (Rental Revenue) : nuitées + ménage + frais de service voyageur + suppléments. */
   revenueCents: number;
   commissionCents: number;
   paymentFeesCents: number;
+  /** Remboursements aux voyageurs (résolutions Airbnb), en positif. */
+  refundsCents: number;
+  /** Revenu net = CA − commissions − frais de paiement − remboursements. */
   payoutCents: number;
   cityTaxCents: number;
+  /** TVA et autres taxes (hors taxe de séjour). */
+  vatCents: number;
   cleaningFeeCents: number;
   totalPriceCents: number;
 };
@@ -29,6 +35,7 @@ export function needsFinanceDetail(r: Obj): boolean {
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 const cents = (v: number) => Math.round(v * 100);
 const firstNonZero = (...values: unknown[]) => values.map(num).find((v) => v !== 0) ?? 0;
+const sum = (f: Obj, keys: readonly string[]) => keys.reduce((a, k) => a + num(f[k]), 0);
 
 /** Taxes de séjour possibles dans /financeStandardField (Paris : cityTax pour Booking, TOT pour Airbnb). */
 const CITY_TAX_FIELDS = [
@@ -40,10 +47,19 @@ const CITY_TAX_FIELDS = [
   "guestPerPersonPerNightTax",
 ] as const;
 
+/** TVA et autres taxes collectées (hors taxe de séjour). */
+const OTHER_TAX_FIELDS = ["vat", "otherTaxes", "roomTax", "lodgingTax", "hotelTax"] as const;
+
 /** Frais de traitement du paiement supportés par l'hôte. */
 const PAYMENT_FEE_FIELDS = ["paymentServiceProcessingFees", "bookingcomPaymentProcessingFee"] as const;
 
 /**
+ * Définitions Hostaway (Financial Reporting) :
+ *  - Chiffre d'affaires (Rental Revenue) = nuitées + ménage + frais de service voyageur + suppléments,
+ *    avant toute déduction, hors taxes. Calculé comme totalPrice − taxes + remboursements, ce qui
+ *    capte aussi les suppléments que Hostaway ajoute à totalPrice.
+ *  - Revenu net = CA − commissions − frais de paiement − remboursements (taxes déjà hors CA).
+ *
  * @param r   réservation Hostaway (GET /reservations)
  * @param fin détail financier (GET /financeStandardField/reservation/{id}), ou null s'il n'a pas été lu
  */
@@ -51,36 +67,38 @@ export function mapFinance(r: Obj, fin: Obj | null): FinanceAmounts {
   const totalPrice = num(r.totalPrice);
   const status = String(r.status ?? "");
   const isAirbnb = String(r.channelName ?? "").startsWith("airbnb");
+  const confirmed = (CONFIRMED_STATUSES as readonly string[]).includes(status);
 
   // Annulation sans montant conservé : rien n'a été encaissé (Hostaway garde pourtant
   // baseRate / taxes de la réservation initiale dans le détail financier).
   if (status === CANCELLED_STATUS && Math.abs(totalPrice) < 0.005) return zero();
 
   const f = fin ?? {};
-  let cityTax = CITY_TAX_FIELDS.reduce((a, k) => a + num(f[k]), 0);
+  let cityTax = sum(f, CITY_TAX_FIELDS);
   // Airbnb : salesTax reprend la même taxe de séjour que airbnbTransientOccupancyTax.
   if (isAirbnb && num(f.airbnbTransientOccupancyTax) === 0) cityTax += num(f.salesTax);
   // Sans détail financier : champ Airbnb de la réservation.
   if (!fin && isAirbnb) cityTax = num(r.airbnbTransientOccupancyTaxPaidAmount);
+  // Autres canaux : salesTax est une taxe à part entière.
+  const otherTaxes = sum(f, OTHER_TAX_FIELDS) + (isAirbnb ? 0 : num(f.salesTax));
 
-  // Commission hôte + frais de service voyageur (guestChannelFee) : inclus dans totalPrice
-  // mais conservés par la plateforme (vérifié : versement = airbnbPayoutSum).
+  // Commission hôte + frais de service voyageur (guestChannelFee) : le voyageur les paie (ils sont
+  // dans le CA) mais la plateforme les garde.
   const commission =
     firstNonZero(f.hostChannelFee, r.channelCommissionAmount, isAirbnb ? r.airbnbListingHostFee : 0) + num(f.guestChannelFee);
-  const paymentFees = PAYMENT_FEE_FIELDS.reduce((a, k) => a + num(f[k]), 0);
+  const paymentFees = sum(f, PAYMENT_FEE_FIELDS);
   const cleaning = firstNonZero(f.cleaningFeeValue, r.cleaningFee, r.airbnbListingCleaningFee);
 
-  // Résolutions Airbnb : Hostaway les retire de totalPrice, mais ni son rapport « Activité de
-  // location » ni le versement Airbnb (airbnbPayoutSum) ne les déduisent pour un séjour confirmé
-  // (vérifié au centime : 1er-10/11/2026). Pour une annulation, la résolution EST le montant
-  // conservé : on la garde.
-  const resolutions = (CONFIRMED_STATUSES as readonly string[]).includes(status)
-    ? num(f.airbnbClosedResolutionsSum) + num(f.airbnbOpenResolutionsSum)
-    : 0;
+  // Résolutions Airbnb (toujours négatives : remboursements aux voyageurs). Hostaway les retire
+  // de totalPrice. Séjour confirmé : on les rajoute au CA et on les déduit du revenu net.
+  // Annulation : la résolution EST le montant conservé, elle reste dans le CA.
+  const refunds = confirmed ? -(num(f.airbnbClosedResolutionsSum) + num(f.airbnbOpenResolutionsSum)) : 0;
 
   const totalPriceCents = cents(totalPrice);
   const cityTaxCents = cents(cityTax);
-  const revenueCents = totalPriceCents - cents(resolutions) - cityTaxCents;
+  const vatCents = cents(otherTaxes);
+  const refundsCents = cents(refunds);
+  const revenueCents = totalPriceCents - cityTaxCents - vatCents + refundsCents;
   const commissionCents = cents(commission);
   const paymentFeesCents = cents(paymentFees);
 
@@ -88,8 +106,10 @@ export function mapFinance(r: Obj, fin: Obj | null): FinanceAmounts {
     revenueCents,
     commissionCents,
     paymentFeesCents,
-    payoutCents: revenueCents - commissionCents - paymentFeesCents,
+    refundsCents,
+    payoutCents: revenueCents - commissionCents - paymentFeesCents - refundsCents,
     cityTaxCents,
+    vatCents,
     cleaningFeeCents: cents(cleaning),
     totalPriceCents,
   };
@@ -100,8 +120,10 @@ function zero(): FinanceAmounts {
     revenueCents: 0,
     commissionCents: 0,
     paymentFeesCents: 0,
+    refundsCents: 0,
     payoutCents: 0,
     cityTaxCents: 0,
+    vatCents: 0,
     cleaningFeeCents: 0,
     totalPriceCents: 0,
   };

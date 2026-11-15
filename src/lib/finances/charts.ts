@@ -8,7 +8,7 @@ export type ChartTrendPoint = {
   shortLabel: string;
   payout: number;
   fees: number;
-  cityTax: number;
+  refunds: number;
   stays: number;
   highlight?: boolean;
 };
@@ -45,7 +45,7 @@ export function trendPoints(report: Report, highlight: string[] = []): ChartTren
       shortLabel,
       payout: t.payout,
       fees: t.commission + t.paymentFees,
-      cityTax: t.cityTax,
+      refunds: t.refunds,
       stays: t.stays,
       highlight: highlight.includes(b.key),
     };

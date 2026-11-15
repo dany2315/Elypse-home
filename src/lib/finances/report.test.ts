@@ -166,15 +166,16 @@ describe("mapFinance (champs Hostaway réels)", () => {
     assert.equal(g.payoutCents, 80000);
   });
 
-  it("Booking : cityTax séparée, TVA conservée dans les revenus", () => {
+  it("Booking : taxe de séjour et TVA hors chiffre d'affaires", () => {
     const m = mapFinance(
       { channelName: "bookingcom", status: "new", totalPrice: 534.71, channelCommissionAmount: 80.94 },
       { hostChannelFee: 80.94, baseRate: 432.82, vat: 43.28, cityTax: 58.61 },
     );
     assert.equal(m.cityTaxCents, 5861);
-    assert.equal(m.revenueCents, 47610);
+    assert.equal(m.vatCents, 4328);
+    assert.equal(m.revenueCents, 43282); // = baseRate
     assert.equal(m.commissionCents, 8094);
-    assert.equal(m.payoutCents, 39516);
+    assert.equal(m.payoutCents, 35188);
   });
 
   it("annulation sans montant conservé : tout à zéro", () => {
@@ -235,14 +236,15 @@ describe("intervalle de dates", () => {
 });
 
 describe("mapFinance — résolutions Airbnb", () => {
-  it("séjour confirmé : résolution non déduite (comme Hostaway et airbnbPayoutSum)", () => {
+  it("séjour confirmé : CA avant remboursement, revenu net après", () => {
     // Cas réel : totalPrice 693,85 = 893,85 − 200 de résolution ; payout Airbnb 674,56.
     const m = mapFinance(
       { channelName: "airbnbOfficial", status: "new", totalPrice: 693.85 },
       { hostChannelFee: 123.74, airbnbTransientOccupancyTax: 95.55, airbnbClosedResolutionsSum: -200, airbnbPayoutSum: 674.56 },
     );
-    assert.equal(m.revenueCents, 79830);
-    assert.equal(m.payoutCents, 67456);
+    assert.equal(m.revenueCents, 79830); // CA = totalPrice + 200 − taxe de séjour
+    assert.equal(m.refundsCents, 20000);
+    assert.equal(m.payoutCents, 47456); // 798,30 − 123,74 − 200
   });
   it("annulation : la résolution est le montant conservé", () => {
     const m = mapFinance(
@@ -250,5 +252,30 @@ describe("mapFinance — résolutions Airbnb", () => {
       { airbnbClosedResolutionsSum: 205.94, airbnbPayoutSum: 205.94 },
     );
     assert.equal(m.payoutCents, 20594);
+  });
+});
+
+describe("revenu net et remboursements dans le récapitulatif", () => {
+  it("revenu net = CA − commissions − frais − remboursements, répartis à la nuit", () => {
+    const r = resa({
+      id: 50,
+      arrival: "2026-10-30",
+      departure: "2026-11-01",
+      nights: 2,
+      revenueCents: 40000,
+      commissionCents: 6000,
+      refundsCents: 10000,
+      vatCents: 2000,
+      payoutCents: 24000,
+    });
+    const base = { reservations: [r], biens, mode: "sejour" as const, cancellations: "versement" as const };
+    const oct = buildReport({ ...base, period: { year: 2026, month: 10 } }).total;
+    assert.equal(oct.revenue, 40000);
+    assert.equal(oct.refunds, 10000);
+    assert.equal(oct.vat, 2000);
+    assert.equal(oct.payout, 24000);
+    const half = buildReport({ ...base, period: { from: "2026-10-31", to: "2026-10-31" } }).total;
+    assert.equal(half.refunds, 5000);
+    assert.equal(half.payout, 12000);
   });
 });

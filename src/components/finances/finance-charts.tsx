@@ -16,7 +16,7 @@ export type TrendPoint = {
   shortLabel: string;
   payout: number;
   fees: number;
-  cityTax: number;
+  refunds: number;
   stays: number;
   highlight?: boolean;
 };
@@ -24,9 +24,9 @@ export type BarItem = { key: string; label: string; value: number; detail?: stri
 export type ShareItem = { key: string; label: string; value: number };
 
 const SERIES = [
-  { key: "payout", label: "Versement total", color: "#3a5bc7", ink: "#ffffff" },
+  { key: "payout", label: "Revenu net", color: "#3a5bc7", ink: "#ffffff" },
   { key: "fees", label: "Commissions et frais", color: "#c9a45c", ink: "#12162a" },
-  { key: "cityTax", label: "Taxe de séjour", color: "#7a6fd6", ink: "#ffffff" },
+  { key: "refunds", label: "Remboursements", color: "#7a6fd6", ink: "#ffffff" },
 ] as const;
 
 const eurFmt = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
@@ -82,7 +82,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
   const [tip, setTip] = useState<Tip>(null);
   const frame = useRef<HTMLDivElement>(null);
   const id = useId();
-  const totals = points.map((p) => p.payout + p.fees + p.cityTax);
+  const totals = points.map((p) => p.payout + p.fees + p.refunds);
   const ticks = niceTicks(Math.max(0, ...totals));
   const top = ticks[ticks.length - 1] || 1;
   const maxIndex = totals.indexOf(Math.max(...totals));
@@ -130,7 +130,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
                     role="listitem"
                     tabIndex={0}
                     aria-describedby={tip?.point.key === p.key ? `${id}-tip` : undefined}
-                    aria-label={`${p.label} : versement ${eur(p.payout)}, commissions et frais ${eur(p.fees)}, taxe de séjour ${eur(p.cityTax)}`}
+                    aria-label={`${p.label} : chiffre d'affaires ${eur(p.payout + p.fees + p.refunds)}, revenu net ${eur(p.payout)}, commissions et frais ${eur(p.fees)}, remboursements ${eur(p.refunds)}`}
                     onPointerEnter={(e) => show(e, p)}
                     onFocus={(e) => show(e, p)}
                     onBlur={() => setTip(null)}
@@ -183,8 +183,8 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
           >
             <p className="font-medium text-ink first-letter:uppercase">{tip.point.label}</p>
             <p className="mt-0.5 text-muted-foreground">
-              {tip.point.stays} séjour{tip.point.stays > 1 ? "s" : ""} · payé par les voyageurs{" "}
-              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.payout + tip.point.fees + tip.point.cityTax)}</span>
+              {tip.point.stays} séjour{tip.point.stays > 1 ? "s" : ""} · chiffre d&apos;affaires{" "}
+              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.payout + tip.point.fees + tip.point.refunds)}</span>
             </p>
             <ul className="mt-2 space-y-1">
               {[...SERIES].reverse().map((s) => (
@@ -239,7 +239,7 @@ function MobileTrend({ points, totals }: { points: TrendPoint[]; totals: number[
               <div className="mt-1 mb-2 ml-[3.75rem] rounded-xl border border-border bg-card px-3 py-2.5 text-xs">
                 <p className="font-medium text-ink first-letter:uppercase">{p.label}</p>
                 <p className="mt-0.5 text-muted-foreground">
-                  {p.stays} séjour{p.stays > 1 ? "s" : ""} · payé par les voyageurs{" "}
+                  {p.stays} séjour{p.stays > 1 ? "s" : ""} · chiffre d&apos;affaires{" "}
                   <span className="font-semibold text-ink tabular-nums">{eur(totals[i])}</span>
                 </p>
                 <ul className="mt-1.5 space-y-1">
@@ -269,7 +269,7 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
   return (
     <Card title={title} subtitle={subtitle} className={className}>
       {sorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun versement sur la période.</p>
+        <p className="text-sm text-muted-foreground">Aucun revenu sur la période.</p>
       ) : (
         <ul className="space-y-3">
           {sorted.map((i) => (

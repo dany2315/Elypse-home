@@ -302,16 +302,21 @@ model Reservation {
   nights               Int
   currency             String          @default("EUR")
 
-  /// Revenus de location : payé par le voyageur, hors taxe de séjour.
+  /// Chiffre d'affaires (Rental Revenue Hostaway) : nuitées + ménage + frais de service voyageur
+  /// + suppléments, avant remboursements, hors taxes.
   revenueCents     Int @default(0)
-  /// Commission de la plateforme (Airbnb, Booking…).
+  /// Commission de la plateforme (Airbnb, Booking…), frais de service voyageur compris.
   commissionCents  Int @default(0)
   /// Frais de traitement du paiement.
   paymentFeesCents Int @default(0)
-  /// Versement total = revenus − commissions − frais de paiement (avant impôts).
+  /// Remboursements aux voyageurs (résolutions Airbnb), en positif.
+  refundsCents     Int @default(0)
+  /// Revenu net = chiffre d'affaires − commissions − frais de paiement − remboursements.
   payoutCents      Int @default(0)
   /// Taxe de séjour (City Tax).
   cityTaxCents     Int @default(0)
+  /// TVA et autres taxes collectées (hors taxe de séjour).
+  vatCents         Int @default(0)
   /// Frais de ménage réellement facturés dans la réservation (0 sinon).
   cleaningFeeCents Int @default(0)
   /// totalPrice Hostaway (référence).

@@ -45,8 +45,12 @@ export type ReportReservation = {
   revenueCents: number;
   commissionCents: number;
   paymentFeesCents: number;
+  /** Remboursements aux voyageurs (résolutions Airbnb), en positif. */
+  refundsCents?: number;
   payoutCents: number;
   cityTaxCents: number;
+  /** TVA et autres taxes (hors taxe de séjour). */
+  vatCents?: number;
   cleaningFeeCents: number;
 };
 
@@ -59,11 +63,17 @@ export type Period = { year: number; month?: number } | { from: string; to: stri
 export type Bucket = { key: string; start: string; end: string; days: number; partial: boolean };
 
 export type Totals = {
+  /** Chiffre d'affaires (Rental Revenue). */
   revenue: number;
   commission: number;
   paymentFees: number;
+  /** Remboursements aux voyageurs. */
+  refunds: number;
+  /** Revenu net = CA − commissions − frais de paiement − remboursements. */
   payout: number;
   cityTax: number;
+  /** TVA et autres taxes. */
+  vat: number;
   cleaning: number;
   stays: number;
   nights: number;
@@ -151,7 +161,9 @@ type Share = {
   revenue: number;
   commission: number;
   paymentFees: number;
+  refunds: number;
   cityTax: number;
+  vat: number;
   cleaning: number;
   nights: number;
 };
@@ -173,7 +185,9 @@ export function allocate(r: ReportReservation, mode: Mode, buckets: Bucket[]): S
         revenue: r.revenueCents,
         commission: r.commissionCents,
         paymentFees: r.paymentFeesCents,
+        refunds: r.refundsCents ?? 0,
         cityTax: r.cityTaxCents,
+        vat: r.vatCents ?? 0,
         cleaning: r.cleaningFeeCents,
         nights: r.nights,
       },
@@ -201,7 +215,9 @@ export function allocate(r: ReportReservation, mode: Mode, buckets: Bucket[]): S
       revenue: slice(nightlyRevenue, offset, n, total) + cleaning,
       commission: slice(r.commissionCents, offset, n, total),
       paymentFees: slice(r.paymentFeesCents, offset, n, total),
+      refunds: slice(r.refundsCents ?? 0, offset, n, total),
       cityTax: slice(r.cityTaxCents, offset, n, total),
+      vat: slice(r.vatCents ?? 0, offset, n, total),
       cleaning,
       nights: n,
     });
@@ -216,7 +232,9 @@ class Acc {
   revenue = 0;
   commission = 0;
   paymentFees = 0;
+  refunds = 0;
   cityTax = 0;
+  vat = 0;
   cleaning = 0;
   nights = 0;
   occupiedNights = 0;
@@ -226,7 +244,9 @@ class Acc {
     this.revenue += s.revenue;
     this.commission += s.commission;
     this.paymentFees += s.paymentFees;
+    this.refunds += s.refunds;
     this.cityTax += s.cityTax;
+    this.vat += s.vat;
     this.cleaning += s.cleaning;
     this.nights += s.nights;
     this.ids.add(id);
@@ -237,9 +257,11 @@ class Acc {
       revenue: this.revenue,
       commission: this.commission,
       paymentFees: this.paymentFees,
-      // Versement dérivé : identique à la somme des versements des réservations.
-      payout: this.revenue - this.commission - this.paymentFees,
+      refunds: this.refunds,
+      // Revenu net dérivé : identique à la somme des revenus nets des réservations.
+      payout: this.revenue - this.commission - this.paymentFees - this.refunds,
       cityTax: this.cityTax,
+      vat: this.vat,
       cleaning: this.cleaning,
       stays: this.ids.size,
       nights: this.nights,

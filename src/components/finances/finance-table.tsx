@@ -6,12 +6,14 @@ export type TableRow = { key: string; label: string; totals: Totals; muted?: boo
 
 /** Colonnes du récapitulatif (ordre validé avec l'équipe). */
 const AMOUNT_COLUMNS: { key: keyof Totals; label: string; hint?: string; strong?: boolean }[] = [
-  { key: "revenue", label: "Revenus de location", hint: "Payé par le voyageur, hors taxe de séjour" },
-  { key: "commission", label: "Commissions", hint: "Commissions des plateformes (Airbnb, Booking…)" },
+  { key: "revenue", label: "Chiffre d'affaires", hint: "Nuitées + ménage + frais de service voyageur + suppléments, hors taxes (Rental Revenue Hostaway)", strong: true },
+  { key: "cleaning", label: "dont ménage", hint: "Frais de ménage facturés dans la réservation (inclus dans le chiffre d'affaires)" },
+  { key: "commission", label: "Commissions", hint: "Commissions des plateformes, frais de service voyageur compris" },
   { key: "paymentFees", label: "Frais de paiement", hint: "Frais de traitement du paiement" },
-  { key: "payout", label: "Versement total", hint: "Revenus − commissions − frais de paiement, avant impôts", strong: true },
-  { key: "cityTax", label: "Taxe de séjour", hint: "City Tax" },
-  { key: "cleaning", label: "Ménage", hint: "Frais de ménage facturés dans la réservation" },
+  { key: "refunds", label: "Remboursements", hint: "Remboursements aux voyageurs (résolutions Airbnb)" },
+  { key: "payout", label: "Revenu net", hint: "Chiffre d'affaires − commissions − frais de paiement − remboursements", strong: true },
+  { key: "cityTax", label: "Taxe de séjour", hint: "City Tax, collectée pour la ville (hors chiffre d'affaires)" },
+  { key: "vat", label: "TVA", hint: "TVA et autres taxes collectées (hors chiffre d'affaires)" },
 ];
 
 export function FinanceTable({
@@ -27,7 +29,7 @@ export function FinanceTable({
 }) {
   return (
     <div className="overflow-x-auto rounded-3xl border border-border/80 bg-card shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)]">
-      <table className="w-full min-w-[980px] border-collapse text-sm">
+      <table className="w-full min-w-[1180px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-border/80 bg-sand/40 text-left text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
             <th className="sticky left-0 bg-sand/40 px-4 py-3 backdrop-blur">{firstColumn}</th>
