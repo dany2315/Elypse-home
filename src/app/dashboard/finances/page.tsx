@@ -75,7 +75,11 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
 
       <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Chiffre d'affaires" value={eur(report.total.revenue)} />
+        <Kpi
+          label="Chiffre d'affaires"
+          value={eur(report.total.revenue)}
+          note={`Taxes comprises (comme Hostaway) : ${eur(report.total.revenue + report.total.cityTax + report.total.vat)}`}
+        />
         <Kpi label="Commissions, frais et remboursements" value={eur(report.total.commission + report.total.paymentFees + report.total.refunds)} />
         <Kpi label="Frais de ménage" value={eur(report.total.cleaning)} />
         <Kpi label="Revenu net (bénéfice)" value={eur(report.total.payout)} accent />
@@ -137,7 +141,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
   );
 }
 
-function Kpi({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Kpi({ label, value, accent, note }: { label: string; value: string; accent?: boolean; note?: string }) {
   return (
     <div
       className={
@@ -150,6 +154,7 @@ function Kpi({ label, value, accent }: { label: string; value: string; accent?: 
         {label}
       </p>
       <p className={`mt-2 font-serif text-3xl tabular-nums ${accent ? "text-ivory" : "text-ink"}`}>{value}</p>
+      {note && <p className={`mt-1.5 text-xs ${accent ? "text-ivory/70" : "text-muted-foreground"}`}>{note}</p>}
     </div>
   );
 }
