@@ -1,20 +1,9 @@
 "use client";
 
-import { Check, Copy, Download, ExternalLink, Link2, Loader2, MapPin, Printer, RefreshCw } from "lucide-react";
+import { Check, Copy, Download, ExternalLink, Link2, Loader2, MapPin, Printer } from "lucide-react";
 import QRCode from "qrcode";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { regenerateLivretToken } from "@/app/dashboard/actions";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { downloadBlob, printBlob, renderPrintCard } from "@/lib/print-card";
@@ -65,25 +54,19 @@ export function useCopy() {
   return { copied, copy };
 }
 
-/** Panneau « Lien du livret » : copier, ouvrir, QR code, régénérer. */
+/** Panneau « Lien du livret » : copier, ouvrir, QR code. Le lien voyageur est fixe (pas de régénération). */
 export function LivretLinkPanel({
-  livretId,
   url,
   name,
   title,
-  onRegenerated,
 }: {
-  livretId: string;
   url: string;
   name: string;
   /** Titre affiché aux voyageurs (utilisé sur la carte à imprimer). */
   title?: string;
-  onRegenerated?: (url: string) => void;
 }) {
   const { copied, copy } = useCopy();
   const [qr, setQr] = useState<string>("");
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     QRCode.toDataURL(url, { margin: 1, width: 480, color: { dark: "#070c1c", light: "#ffffff" } }).then(setQr);
@@ -107,17 +90,6 @@ export function LivretLinkPanel({
     }
   }
 
-  function regenerate() {
-    startTransition(async () => {
-      const res = await regenerateLivretToken(livretId);
-      if (!res.ok) return void toast.error(res.error);
-      const next = url.replace(/\/l\/[^/?#]+/, `/l/${res.data}`);
-      onRegenerated?.(next);
-      setConfirmOpen(false);
-      toast.success("Nouveau lien généré", { description: "L'ancien lien ne fonctionne plus." });
-    });
-  }
-
   return (
     <div className="space-y-4">
       <div className="rounded-xl border bg-muted/50 p-3">
@@ -128,16 +100,13 @@ export function LivretLinkPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Button onClick={() => copy(url)} className="col-span-2">
+        <Button onClick={() => copy(url)}>
           {copied ? <Check /> : <Copy />} {copied ? "Copié" : "Copier le lien"}
         </Button>
         <Button variant="outline" asChild>
           <a href={url} target="_blank" rel="noreferrer">
             <ExternalLink /> Ouvrir
           </a>
-        </Button>
-        <Button variant="outline" onClick={() => setConfirmOpen(true)}>
-          <RefreshCw /> Régénérer
         </Button>
       </div>
 
@@ -166,47 +135,20 @@ export function LivretLinkPanel({
         </div>
       )}
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Régénérer le lien ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Un nouveau lien sera créé pour « {name} ». L&apos;ancien lien (et celui de la page emplacement) cessera immédiatement de fonctionner
-              (pensez à mettre à jour vos messages automatiques et QR codes imprimés).
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                regenerate();
-              }}
-              disabled={pending}
-            >
-              {pending && <Loader2 className="animate-spin" />} Régénérer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
 
 export function LivretLinkButton({
-  livretId,
   url,
   name,
   title,
   className,
-  onRegenerated,
 }: {
-  livretId: string;
   url: string;
   name: string;
   title?: string;
   className?: string;
-  onRegenerated?: (url: string) => void;
 }) {
   return (
     <Popover>
@@ -216,7 +158,7 @@ export function LivretLinkButton({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(92vw,22rem)]">
-        <LivretLinkPanel livretId={livretId} url={url} name={name} title={title} onRegenerated={onRegenerated} />
+        <LivretLinkPanel url={url} name={name} title={title} />
       </PopoverContent>
     </Popover>
   );

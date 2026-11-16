@@ -5,7 +5,6 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { cleanupImages } from "@/lib/image-cleanup";
-import { generateLivretToken } from "@/lib/token";
 
 /* --------------------------------- Schémas -------------------------------- */
 
@@ -171,21 +170,6 @@ export async function setLivretActive(id: string, active: boolean): Promise<Resu
     await prisma.livret.update({ where: { id }, data: { active } });
     refresh(id);
     return { ok: true };
-  } catch (e) {
-    return fail(e);
-  }
-}
-
-/** Génère un nouveau lien : l'ancien cesse immédiatement de fonctionner. */
-export async function regenerateLivretToken(id: string): Promise<Result<string>> {
-  try {
-    await requireSession();
-    const { token } = await prisma.livret.update({
-      where: { id },
-      data: { token: generateLivretToken() },
-    });
-    refresh(id);
-    return { ok: true, data: token };
   } catch (e) {
     return fail(e);
   }

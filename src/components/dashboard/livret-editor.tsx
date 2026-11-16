@@ -133,7 +133,7 @@ export function LivretEditor({
                   <Eye /> Aperçu
                 </Link>
               </Button>
-              <LivretLinkButton livretId={id} url={url} name={form.name} title={form.title} onRegenerated={() => router.refresh()} />
+              <LivretLinkButton url={url} name={form.name} title={form.title} />
             </div>
           </div>
 

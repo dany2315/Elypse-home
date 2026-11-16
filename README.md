@@ -5,7 +5,7 @@ Gestionnaire de livrets d'accueil Airbnb (Next.js 16 · Prisma 7 · Neon · Bett
 - **`/login`** : connexion administrateur (inscription désactivée).
 - **`/dashboard`** : liste des livrets (modifier, aperçu, lien, recos, équipements, transport, contacts, activer/désactiver).
 - **`/dashboard/finances`** : récapitulatif financier mensuel / annuel par bien, alimenté par Hostaway (lecture seule).
-- **`/l/[jeton]`** : livret public voyageur, bilingue FR/EN, pensé pour mobile. Le jeton (48 caractères) peut être régénéré depuis le dashboard : l'ancien lien cesse alors de fonctionner.
+- **`/l/[jeton]`** : livret public voyageur, bilingue FR/EN, pensé pour mobile. Le jeton (48 caractères) est fixe : le lien voyageur ne change jamais (pas de régénération depuis le dashboard).
 
 ## Démarrage
 

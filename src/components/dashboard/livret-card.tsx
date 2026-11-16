@@ -173,7 +173,7 @@ export function LivretCard({ livret }: { livret: LivretCardData }) {
               <Eye /> Aperçu
             </Link>
           </Button>
-          <LivretLinkButton livretId={livret.id} url={livret.url} name={livret.name} title={livret.title} />
+          <LivretLinkButton url={livret.url} name={livret.name} title={livret.title} />
         </div>
 
         <EmplacementButton url={emplacementUrl(livret.url)} />
