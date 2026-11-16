@@ -66,3 +66,13 @@ export function bienBars(report: Report) {
 export function channelShares(report: Report) {
   return report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.totals.gross }));
 }
+
+/** Couleurs des plateformes, dans l'ordre du graphique « par plateforme » (bleu, or, violet, puis gris). */
+export function channelColors(report: Report): Record<string, string> {
+  const palette = ["#3a5bc7", "#c9a45c", "#7a6fd6"];
+  return Object.fromEntries(
+    channelShares(report)
+      .filter((c) => c.value > 0)
+      .map((c, i) => [c.key, palette[i] ?? "#a9aebd"]),
+  );
+}

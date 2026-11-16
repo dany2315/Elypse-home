@@ -31,6 +31,10 @@ Chaque option affiche sous le filtre une phrase qui explique son effet (`MODES` 
 - **Date de réservation** : tout le séjour compte au mois où il a été réservé (suivi des ventes).
 - Annulations **Si elles rapportent** (par défaut) : comptées seulement si la plateforme verse quelque chose ; **Toutes** ; **Aucune**.
 
+## Affichage par réservation
+
+`report.reservations` (`ReservationLine`) : chaque réservation comptée, avec la part de ses montants qui tombe dans la période. En mode « nuits passées », un séjour à cheval affiche « 2 nuits sur 3 dans la période » et 2/3 des montants (le reste compte dans la période voisine). La référence est passée par `publicReference` : pour Airbnb, seul le code de confirmation est gardé (la référence Hostaway contient l'identifiant du voyageur).
+
 ## Colonnes → champs
 
 Notation : `r.` = champ de la réservation, `f.` = champ de `/financeStandardField`.

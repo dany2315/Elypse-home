@@ -127,8 +127,41 @@ export type Totals = {
 
 export type ReportRow = { key: string; name: string; totals: Totals; byMonth: Record<string, Totals> };
 
+/**
+ * Référence affichable : pour Airbnb, la référence Hostaway contient l'identifiant du voyageur
+ * (« <listing>-guest-<id>-confirmation-<CODE> ») ; on ne garde que le code de confirmation.
+ */
+export function publicReference(ref: string | null | undefined): string | null {
+  if (!ref) return null;
+  const code = /confirmation-([A-Z0-9]+)/i.exec(ref)?.[1];
+  if (code) return code;
+  return /guest/i.test(ref) ? null : ref;
+}
+
+/** Une réservation avec la part de ses montants qui tombe dans la période (selon le mode). */
+export type ReservationLine = {
+  id: number;
+  groupKey: string;
+  groupName: string;
+  channel: string;
+  /** Référence de la plateforme (code de confirmation), sans donnée personnelle. */
+  reference: string | null;
+  status: string;
+  arrival: string;
+  departure: string;
+  reservationDate: string | null;
+  /** Nuits du séjour entier. */
+  stayNights: number;
+  /** Montants et nuits comptés dans la période. */
+  totals: Totals;
+  /** Séjour partagé avec une autre période (mode « nuits passées »). */
+  prorata: boolean;
+};
+
 export type Report = {
   buckets: Bucket[];
+  /** Réservations comptées dans la période, par date d'arrivée. */
+  reservations: ReservationLine[];
   rows: ReportRow[];
   total: Totals;
   totalByMonth: Record<string, Totals>;
@@ -376,6 +409,7 @@ export function buildReport(input: ReportInput): Report {
 
   let cancelledIncluded = 0;
   let cancelledExcluded = 0;
+  const lines: ReservationLine[] = [];
 
   for (const r of kept) {
     const group = groupOf(r.listingId);
@@ -399,10 +433,27 @@ export function buildReport(input: ReportInput): Report {
     }
     if (!included) continue;
 
+    const line = new Acc();
     for (const s of shares) {
       usedGroups.add(group);
       for (const k of [`${group}|${s.bucket}`, `${group}|*`, `*|${s.bucket}`, "*|*", `ch:${r.channel}`]) acc(k).add(s, r.id);
+      line.add(s, r.id);
     }
+    const totals = line.totals(0);
+    lines.push({
+      id: r.id,
+      groupKey: group,
+      groupName: groupNames.get(group) ?? group,
+      channel: r.channel,
+      reference: publicReference(r.channelReservationId),
+      status: r.status,
+      arrival: r.arrival,
+      departure: r.departure,
+      reservationDate: r.reservationDate ?? null,
+      stayNights: r.nights,
+      totals,
+      prorata: input.mode === "sejour" && totals.nights !== r.nights,
+    });
   }
 
   const days = buckets.reduce((a, b) => a + b.days, 0);
@@ -424,8 +475,11 @@ export function buildReport(input: ReportInput): Report {
     .map((k) => ({ channel: k.slice(3), totals: get(k, 0) }))
     .sort((a, b) => b.totals.gross - a.totals.gross);
 
+  lines.sort((a, b) => a.arrival.localeCompare(b.arrival) || a.groupName.localeCompare(b.groupName, "fr") || a.id - b.id);
+
   return {
     buckets,
+    reservations: lines,
     rows,
     total: get("*|*", days * groups.length),
     totalByMonth: Object.fromEntries(buckets.map((b) => [b.key, get(`*|${b.key}`, b.days * groups.length)])),
@@ -449,5 +503,8 @@ const CHANNEL_LABELS: Record<string, string> = {
   google: "Google",
 };
 export const channelLabel = (c: string) => CHANNEL_LABELS[c] ?? c;
+
+const STATUS_LABELS: Record<string, string> = { new: "Confirmée", modified: "Modifiée", cancelled: "Annulée" };
+export const statusLabel = (s: string) => STATUS_LABELS[s] ?? s;
 
 export const occupancy = (t: Totals) => (t.availableNights > 0 ? t.occupiedNights / t.availableNights : null);

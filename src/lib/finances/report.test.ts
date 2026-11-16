@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { mapFinance } from "./mapping";
-import { allocate, buildReport, dedupe, nightsByMonth, periodBuckets, type ReportReservation } from "./report";
+import { allocate, buildReport, dedupe, nightsByMonth, periodBuckets, publicReference, type ReportReservation } from "./report";
 
 const resa = (o: Partial<ReportReservation> & { id: number }): ReportReservation => ({
   listingId: 1,
@@ -89,6 +89,13 @@ describe("buildReport", () => {
     const t = year.total;
     assert.equal(t.gross - t.commission - t.paymentFees - t.refunds - t.cityTax - t.vat, t.payout);
     assert.equal(oct.total.gross + nov.total.gross, 31500);
+    // Vue par réservation : la part de la réservation dans chaque mois, marquée « au prorata ».
+    assert.equal(oct.reservations.length, 1);
+    assert.equal(oct.reservations[0].totals.nights, 2);
+    assert.equal(oct.reservations[0].stayNights, 3);
+    assert.equal(oct.reservations[0].prorata, true);
+    assert.equal(oct.reservations[0].totals.payout + nov.reservations[0].totals.payout, 26700);
+    assert.equal(oct.reservations[0].groupName, "Miromesnil");
     assert.equal(year.total.stays, 1, "un séjour sur deux mois n'est compté qu'une fois sur l'année");
     assert.equal(year.totalByMonth["2026-10"].revenue, 22000);
     assert.equal(year.totalByMonth["2026-11"].revenue, 8000);
@@ -298,5 +305,14 @@ describe("mapFinance — frais de paiement Booking (cas réel Le Amelot 62)", ()
   it("frais fournis par Hostaway : ils priment", () => {
     const m = mapFinance({ channelName: "bookingcom", status: "new", totalPrice: 1000 }, { bookingcomPaymentProcessingFee: 12, hostChannelFee: 150 });
     assert.equal(m.paymentFeesCents, 1200);
+  });
+});
+
+describe("publicReference", () => {
+  it("ne garde que le code de confirmation Airbnb (sans identifiant voyageur)", () => {
+    assert.equal(publicReference("590377-guest-540959960-confirmation-HMABCD1234"), "HMABCD1234");
+    assert.equal(publicReference("5893200214"), "5893200214");
+    assert.equal(publicReference("123-guest-456"), null);
+    assert.equal(publicReference(null), null);
   });
 });

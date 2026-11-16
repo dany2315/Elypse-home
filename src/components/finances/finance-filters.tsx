@@ -6,7 +6,7 @@ import { useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MONTH_NAMES, toSearchParams, validDate, type FinanceFilters, type Periode } from "@/lib/finances/filters";
+import { MONTH_NAMES, toSearchParams, validDate, VUES, type FinanceFilters, type Periode } from "@/lib/finances/filters";
 import { CANCEL_FILTERS, MODES } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
 
@@ -126,6 +126,25 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
               ))}
             </SelectContent>
           </Select>
+        </Field>
+
+        <Field label="Affichage">
+          <div className="inline-flex h-8 rounded-lg border border-input p-0.5">
+            {VUES.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={filters.vue === value}
+                onClick={() => update({ vue: value })}
+                className={cn(
+                  "rounded-md px-3 text-sm font-medium whitespace-nowrap transition",
+                  filters.vue === value ? "bg-ink text-ivory" : "text-ink/70 hover:bg-accent",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </Field>
 
         {pending && <Loader2 className="mb-2 size-4 animate-spin text-gold-deep" aria-label="Chargement" />}

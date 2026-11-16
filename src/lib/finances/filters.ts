@@ -14,7 +14,15 @@ export type FinanceFilters = {
   bien: string;
   mode: Mode;
   annulations: CancelFilter;
+  /** Détail affiché : par bien (récapitulatif) ou réservation par réservation. */
+  vue: Vue;
 };
+
+export type Vue = "biens" | "reservations";
+export const VUES: { value: Vue; label: string }[] = [
+  { value: "biens", label: "Par bien" },
+  { value: "reservations", label: "Par réservation" },
+];
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -59,6 +67,7 @@ export function parseFilters(sp: SearchParams, today = todayInParis()): FinanceF
     bien: one(sp.bien) || "tous",
     mode: MODES.some((m) => m.value === mode) ? (mode as Mode) : "sejour",
     annulations: CANCEL_FILTERS.some((c) => c.value === annulations) ? (annulations as CancelFilter) : "versement",
+    vue: one(sp.vue) === "reservations" ? "reservations" : "biens",
   };
 }
 
@@ -74,6 +83,7 @@ export function toSearchParams(f: FinanceFilters): URLSearchParams {
   if (f.bien !== "tous") p.set("bien", f.bien);
   if (f.mode !== "sejour") p.set("mode", f.mode);
   if (f.annulations !== "versement") p.set("annulations", f.annulations);
+  if (f.vue !== "biens") p.set("vue", f.vue);
   return p;
 }
 

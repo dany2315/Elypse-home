@@ -4,13 +4,14 @@ import Link from "next/link";
 import { RankedBars, ShareBar, TrendChart } from "@/components/finances/finance-charts";
 import { FinanceFiltersBar } from "@/components/finances/finance-filters";
 import { FinanceTable } from "@/components/finances/finance-table";
+import { ReservationTable } from "@/components/finances/reservation-table";
 import { SyncButton } from "@/components/finances/sync-button";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { cancelLabel, eur, int, modeLabel, parseFilters, pct, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
 import { occupancy } from "@/lib/finances/report";
 import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
-import { bienBars, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
+import { bienBars, channelColors, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
 import { buildSections } from "@/lib/finances/views";
 
 export const metadata: Metadata = { title: "Finances" };
@@ -155,12 +156,19 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         />
       </div>
 
-      {main.map((s) => (
-        <section key={s.id} className="mt-6">
-          <h2 className="mb-3 font-serif text-2xl text-ink">{s.title}</h2>
-          <FinanceTable firstColumn={s.firstColumn} rows={s.rows} total={s.total} />
+      {filters.vue === "reservations" ? (
+        <section className="mt-6">
+          <h2 className="mb-3 font-serif text-2xl text-ink">Par réservation</h2>
+          <ReservationTable lines={report.reservations} channelColors={channelColors(report)} />
         </section>
-      ))}
+      ) : (
+        main.map((s) => (
+          <section key={s.id} className="mt-6">
+            <h2 className="mb-3 font-serif text-2xl text-ink">{s.title}</h2>
+            <FinanceTable firstColumn={s.firstColumn} rows={s.rows} total={s.total} />
+          </section>
+        ))
+      )}
 
       <section className="mt-10">
         <h2 className="mb-3 font-serif text-2xl text-ink">{channels.title}</h2>
