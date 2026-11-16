@@ -83,9 +83,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           note="Tout ce que les voyageurs ont payé"
           details={[
             ["dont frais de ménage", eur(report.total.cleaning)],
-            ["Séjours", int(report.total.stays)],
-            ["Nuitées", int(report.total.nights)],
-            ["Occupation", pct(occupancy(report.total))],
+            ["dont taxes (séjour, TVA)", eur(report.total.cityTax + report.total.vat)],
           ]}
         />
         <Kpi
@@ -120,6 +118,13 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           ]}
         />
       </section>
+
+      {/* Activité : une seule bande, pas de cartes. */}
+      <dl className="mt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2 rounded-3xl border border-border/80 bg-card px-5 py-4">
+        <Activity label="séjours" value={int(report.total.stays)} />
+        <Activity label="nuitées" value={int(report.total.nights)} />
+        <Activity label="d'occupation" value={pct(occupancy(report.total))} hint="Nuits occupées / nuits disponibles du calendrier" />
+      </dl>
 
       <p className="mt-6 text-sm text-muted-foreground">
         <span className="font-medium text-ink first-letter:uppercase">{periodLabel(filters)}</span> · {modeLabel(filters.mode, filters.periode)} ·{" "}
@@ -187,6 +192,15 @@ function cancelCounts(included: number, excluded: number) {
 }
 
 type Detail = [label: string, value: string];
+
+function Activity({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="flex items-baseline gap-2" title={hint}>
+      <dt className="order-2 text-sm text-muted-foreground">{label}</dt>
+      <dd className="order-1 font-serif text-2xl text-ink tabular-nums">{value}</dd>
+    </div>
+  );
+}
 
 /** Carte chiffre clé ; « Voir le détail » déplie la décomposition du montant (accordéon natif). */
 function Kpi({ label, value, accent, note, details }: { label: string; value: string; accent?: boolean; note?: string; details?: Detail[] }) {
