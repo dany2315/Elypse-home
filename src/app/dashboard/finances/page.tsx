@@ -1,4 +1,4 @@
-import { Building2, Download, TriangleAlert } from "lucide-react";
+import { Building2, ChevronDown, Download, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankedBars, ShareBar, TrendChart } from "@/components/finances/finance-charts";
@@ -75,27 +75,50 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
 
       <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
 
-      <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Chiffre d'affaires" value={eur(report.total.gross)} note="Tout ce que les voyageurs ont payé" />
+      {/* items-start : ouvrir un détail n'étire pas les autres cartes. */}
+      <section className="mt-8 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Kpi
+          label="Chiffre d'affaires"
+          value={eur(report.total.gross)}
+          note="Tout ce que les voyageurs ont payé"
+          details={[
+            ["dont frais de ménage", eur(report.total.cleaning)],
+            ["Séjours", int(report.total.stays)],
+            ["Nuitées", int(report.total.nights)],
+            ["Occupation", pct(occupancy(report.total))],
+          ]}
+        />
         <Kpi
           label="Commissions et frais"
           value={`− ${eur(report.total.commission + report.total.paymentFees + report.total.refunds)}`}
-          note={`Commissions ${eur(report.total.commission)} · paiement ${eur(report.total.paymentFees)} · remboursements ${eur(report.total.refunds)}`}
+          note="Retenus par les plateformes"
+          details={[
+            ["Commissions des plateformes", eur(report.total.commission)],
+            ["Frais de paiement", eur(report.total.paymentFees)],
+            ["Remboursements aux voyageurs", eur(report.total.refunds)],
+          ]}
         />
         <Kpi
           label="Taxes à reverser"
           value={`− ${eur(report.total.cityTax + report.total.vat)}`}
-          note={`Taxe de séjour ${eur(report.total.cityTax)} · TVA ${eur(report.total.vat)}`}
+          note="Payées par les voyageurs, pas à vous"
+          details={[
+            ["Taxe de séjour", eur(report.total.cityTax)],
+            ["TVA", eur(report.total.vat)],
+          ]}
         />
-        <Kpi label="Bénéfice" value={eur(report.total.payout)} note="Ce qui reste réellement pour vous" accent />
-      </section>
-
-      <section className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Frais de ménage" value={eur(report.total.cleaning)} note="payés par les voyageurs" />
-        <Stat label="Remboursements" value={eur(report.total.refunds)} note="rendus aux voyageurs" />
-        <Stat label="Séjours" value={int(report.total.stays)} />
-        <Stat label="Nuitées" value={int(report.total.nights)} />
-        <Stat label="Occupation" value={pct(occupancy(report.total))} note="nuits occupées / nuits disponibles" />
+        <Kpi
+          label="Bénéfice"
+          value={eur(report.total.payout)}
+          note="Ce qui reste réellement pour vous"
+          accent
+          details={[
+            ["Chiffre d'affaires", eur(report.total.gross)],
+            ["− Commissions et frais", eur(report.total.commission + report.total.paymentFees + report.total.refunds)],
+            ["− Taxes", eur(report.total.cityTax + report.total.vat)],
+            ["= Bénéfice", eur(report.total.payout)],
+          ]}
+        />
       </section>
 
       <p className="mt-6 text-sm text-muted-foreground">
@@ -163,30 +186,34 @@ function cancelCounts(included: number, excluded: number) {
   return parts.length ? ` (${parts.join(", ")})` : "";
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div className="rounded-2xl border border-border/70 bg-card/70 px-4 py-3">
-      <p className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 text-xl text-ink tabular-nums">{value}</p>
-      {note && <p className="text-[11px] text-muted-foreground">{note}</p>}
-    </div>
-  );
-}
+type Detail = [label: string, value: string];
 
-function Kpi({ label, value, accent, note }: { label: string; value: string; accent?: boolean; note?: string }) {
+/** Carte chiffre clé ; « Voir le détail » déplie la décomposition du montant (accordéon natif). */
+function Kpi({ label, value, accent, note, details }: { label: string; value: string; accent?: boolean; note?: string; details?: Detail[] }) {
   return (
-    <div
-      className={
-        accent
-          ? "rounded-3xl border border-gold/40 bg-night p-5 text-ivory"
-          : "rounded-3xl border border-border/80 bg-card p-5"
-      }
-    >
-      <p className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${accent ? "text-gold-light" : "text-muted-foreground"}`}>
-        {label}
-      </p>
+    <div className={accent ? "rounded-3xl border border-gold/40 bg-night p-5 text-ivory" : "rounded-3xl border border-border/80 bg-card p-5"}>
+      <p className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${accent ? "text-gold-light" : "text-muted-foreground"}`}>{label}</p>
       <p className={`mt-2 font-serif text-3xl tabular-nums ${accent ? "text-ivory" : "text-ink"}`}>{value}</p>
       {note && <p className={`mt-1.5 text-xs ${accent ? "text-ivory/70" : "text-muted-foreground"}`}>{note}</p>}
+      {details && (
+        <details className="group mt-3">
+          <summary
+            className={`flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium outline-none select-none focus-visible:ring-2 focus-visible:ring-gold/60 [&::-webkit-details-marker]:hidden ${accent ? "text-gold-light" : "text-gold-deep"}`}
+          >
+            <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" aria-hidden />
+            <span className="group-open:hidden">Voir le détail</span>
+            <span className="hidden group-open:inline">Masquer le détail</span>
+          </summary>
+          <dl className={`mt-2 divide-y text-sm ${accent ? "divide-ivory/15" : "divide-border/70"}`}>
+            {details.map(([k, v]) => (
+              <div key={k} className="flex items-baseline justify-between gap-3 py-1.5">
+                <dt className={accent ? "text-ivory/75" : "text-muted-foreground"}>{k}</dt>
+                <dd className={`font-medium whitespace-nowrap tabular-nums ${accent ? "text-ivory" : "text-ink"}`}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      )}
     </div>
   );
 }
