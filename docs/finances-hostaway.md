@@ -33,7 +33,7 @@ Chaque option affiche sous le filtre une phrase qui explique son effet (`MODES` 
 
 ## Affichage par réservation
 
-`report.reservations` (`ReservationLine`) : chaque réservation comptée, avec la part de ses montants qui tombe dans la période. En mode « nuits passées », un séjour à cheval affiche « 2 nuits sur 3 dans la période » et 2/3 des montants (le reste compte dans la période voisine). La référence est passée par `publicReference` : pour Airbnb, seul le code de confirmation est gardé (la référence Hostaway contient l'identifiant du voyageur).
+`report.reservations` (`ReservationLine`) : chaque réservation comptée, avec la part de ses montants qui tombe dans la période. En mode « nuits passées », un séjour à cheval affiche « 2 nuits sur 3 dans la période » et 2/3 des montants (le reste compte dans la période voisine). Le **nom du voyageur** (`reservation.guestName`, champ `guestName` de Hostaway, ou prénom + nom) est stocké en base et affiché uniquement dans le tableau de bord (accès admin) et l'export CSV ; il n'apparaît jamais dans les journaux ni dans `raw`. Airbnb efface le nom quelque temps après le séjour : les réservations Airbnb d'avant mi-septembre 2026 affichent « Nom effacé ». Colonne ajoutée par `prisma/sql/2026-11-finances-3.sql` (appliqué sur staging ; à appliquer en production). La référence est passée par `publicReference` : pour Airbnb, seul le code de confirmation est gardé (la référence Hostaway contient l'identifiant du voyageur).
 
 ## Colonnes → champs
 

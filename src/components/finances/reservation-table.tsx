@@ -64,7 +64,7 @@ export function ReservationTable({
       (l) =>
         (channel === "toutes" || l.channel === channel) &&
         (!onlyCancelled || l.status === "cancelled") &&
-        (!q || l.groupName.toLowerCase().includes(q) || (l.reference ?? "").toLowerCase().includes(q) || String(l.id).includes(q)),
+        (!q || l.groupName.toLowerCase().includes(q) || (l.guestName ?? "").toLowerCase().includes(q) || (l.reference ?? "").toLowerCase().includes(q) || String(l.id).includes(q)),
     );
     if (sort === "benefice") list.sort((a, b) => b.totals.payout - a.totals.payout);
     else if (sort === "ca") list.sort((a, b) => b.totals.gross - a.totals.gross);
@@ -99,8 +99,8 @@ export function ReservationTable({
               setQuery(e.target.value);
               setLimit(PAGE);
             }}
-            placeholder="Bien ou référence"
-            aria-label="Rechercher une réservation par bien ou par référence"
+            placeholder="Voyageur, bien ou référence"
+            aria-label="Rechercher une réservation par voyageur, bien ou référence"
             className="h-9 pl-9"
           />
         </div>
@@ -141,10 +141,12 @@ export function ReservationTable({
       ) : (
         <>
           {/* Bureau : tableau */}
-          <table className="hidden w-full border-collapse text-sm md:table">
+          <div className="hidden overflow-x-auto lg:block">
+          <table className="w-full min-w-[1000px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-border/80 bg-sand/40 text-left text-[10px] font-semibold tracking-[0.15em] text-muted-foreground uppercase">
                 <th className="px-4 py-3">Séjour</th>
+                <th className="px-3 py-3">Voyageur</th>
                 <th className="px-3 py-3">Bien</th>
                 <th className="px-3 py-3">Plateforme</th>
                 <th className="px-3 py-3 text-right">Chiffre d&apos;affaires</th>
@@ -176,7 +178,10 @@ export function ReservationTable({
                           {l.status !== "new" && <StatusBadge status={l.status} />}
                         </span>
                       </td>
-                      <td className="max-w-48 truncate px-3 py-3 text-ink/85">{l.groupName}</td>
+                      <td className="max-w-44 px-3 py-3">
+                        <GuestName name={l.guestName} />
+                      </td>
+                      <td className="max-w-44 truncate px-3 py-3 text-ink/85">{l.groupName}</td>
                       <td className="px-3 py-3">
                         <ChannelTag channel={l.channel} color={channelColors[l.channel]} />
                       </td>
@@ -201,7 +206,7 @@ export function ReservationTable({
                     </tr>
                     {expanded && (
                       <tr className="border-b border-border/60 bg-sand/25">
-                        <td colSpan={8} className="px-4 py-4">
+                        <td colSpan={9} className="px-4 py-4">
                           <Detail line={l} />
                         </td>
                       </tr>
@@ -212,7 +217,7 @@ export function ReservationTable({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-t-gold/50 bg-night text-ivory tabular-nums">
-                <th scope="row" colSpan={3} className="px-4 py-3 text-left font-serif text-base tracking-wide text-gold-light">
+                <th scope="row" colSpan={4} className="px-4 py-3 text-left font-serif text-base tracking-wide text-gold-light">
                   {int(shown.length)} réservation{shown.length > 1 ? "s" : ""} · {int(sum.nights)} nuits
                 </th>
                 <td className="px-3 py-3 text-right whitespace-nowrap">{eur(sum.gross)}</td>
@@ -223,9 +228,10 @@ export function ReservationTable({
               </tr>
             </tfoot>
           </table>
+          </div>
 
           {/* Mobile : une ligne par réservation, détail au toucher */}
-          <ul className="divide-y divide-border/60 md:hidden">
+          <ul className="divide-y divide-border/60 lg:hidden">
             {visible.map((l) => {
               const expanded = open === l.id;
               return (
@@ -237,7 +243,10 @@ export function ReservationTable({
                     className={cn("flex w-full items-start gap-3 px-4 py-3 text-left outline-none focus-visible:bg-accent/40", expanded && "bg-accent/40")}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block font-medium text-ink">
+                      <span className="block truncate font-medium text-ink">
+                        {l.guestName ?? <span className="font-normal text-muted-foreground italic">Nom effacé par la plateforme</span>}
+                      </span>
+                      <span className="block text-sm text-ink/80">
                         {day(l.arrival)} → {day(l.departure)}
                       </span>
                       <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
@@ -316,6 +325,7 @@ function Detail({ line: l }: { line: ReservationLine }) {
         ))}
       </dl>
       <dl className="grid content-start gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+        <Info label="Voyageur" value={l.guestName ?? "Nom effacé par la plateforme après le séjour"} />
         <Info label="Séjour" value={`${full(l.arrival)} → ${full(l.departure)}`} />
         <Info label="Nuits" value={nightsText(l)} />
         <Info label="Plateforme" value={channelLabel(l.channel)} />
@@ -331,6 +341,18 @@ function Detail({ line: l }: { line: ReservationLine }) {
         </p>
       )}
     </div>
+  );
+}
+
+function GuestName({ name }: { name: string | null }) {
+  return name ? (
+    <span className="block truncate font-medium text-ink" title={name}>
+      {name}
+    </span>
+  ) : (
+    <span className="text-xs text-muted-foreground italic" title="Airbnb efface le nom du voyageur quelque temps après le séjour">
+      Nom effacé
+    </span>
   );
 }
 

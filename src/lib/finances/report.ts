@@ -68,6 +68,8 @@ export type ReportReservation = {
   listingId: number;
   channel: string;
   channelReservationId?: string | null;
+  /** Nom du voyageur (vue par réservation uniquement). */
+  guestName?: string | null;
   status: string;
   /** AAAA-MM-JJ */
   arrival: string;
@@ -146,6 +148,8 @@ export type ReservationLine = {
   channel: string;
   /** Référence de la plateforme (code de confirmation), sans donnée personnelle. */
   reference: string | null;
+  /** Nom du voyageur qui a réservé (null : effacé par la plateforme, ex. Airbnb après le séjour). */
+  guestName: string | null;
   status: string;
   arrival: string;
   departure: string;
@@ -446,6 +450,7 @@ export function buildReport(input: ReportInput): Report {
       groupName: groupNames.get(group) ?? group,
       channel: r.channel,
       reference: publicReference(r.channelReservationId),
+      guestName: r.guestName ?? null,
       status: r.status,
       arrival: r.arrival,
       departure: r.departure,

@@ -51,6 +51,7 @@ export async function loadReport(f: FinanceFilters): Promise<Report> {
         listingId: true,
         channel: true,
         channelReservationId: true,
+        guestName: true,
         status: true,
         arrivalDate: true,
         departureDate: true,

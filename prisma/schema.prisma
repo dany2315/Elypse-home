@@ -295,6 +295,8 @@ model Reservation {
   /// Référence de la réservation chez la plateforme (contrôle des doublons).
   channelReservationId String?
   status               String
+  /// Nom du voyageur qui a réservé (affiché dans le tableau de bord, jamais dans les journaux).
+  guestName            String?
   arrivalDate          DateTime        @db.Date
   departureDate        DateTime        @db.Date
   /// Date de réservation (jour, heure du compte Hostaway).

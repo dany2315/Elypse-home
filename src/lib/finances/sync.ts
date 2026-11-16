@@ -105,7 +105,7 @@ export async function syncHostaway(opts: SyncOptions = {}): Promise<SyncResult> 
 
     const existing = new Map(
       (
-        await prisma.reservation.findMany({ select: { id: true, hostawayUpdatedOn: true, financeFetchedAt: true, raw: true } })
+        await prisma.reservation.findMany({ select: { id: true, hostawayUpdatedOn: true, financeFetchedAt: true, raw: true, guestName: true } })
       ).map((r) => [r.id, r]),
     );
 
@@ -138,7 +138,8 @@ export async function syncHostaway(opts: SyncOptions = {}): Promise<SyncResult> 
       const prev = existing.get(r.id);
       const fetched = finance.get(r.id);
       // Incrémental : réservation inchangée depuis la dernière synchro → rien à écrire.
-      if (!opts.full && prev && !fetched && prev.hostawayUpdatedOn === String(r.updatedOn ?? "")) continue;
+      // (Le nom du voyageur, ajouté après coup, est complété au passage.)
+      if (!opts.full && prev && !fetched && prev.hostawayUpdatedOn === String(r.updatedOn ?? "") && prev.guestName === guestNameOf(r)) continue;
       // Détail inchangé : on réutilise celui déjà stocké.
       const prevFinance = (prev?.raw as { finance?: Record<string, unknown> | null } | undefined)?.finance ?? null;
       const fin = fetched ?? (needsFinanceDetail(r) ? prevFinance : null);
@@ -198,6 +199,14 @@ export async function remapReservations(): Promise<number> {
   return rows.length;
 }
 
+/** Nom du voyageur tel qu'affiché dans Hostaway (ou prénom + nom). */
+export function guestNameOf(r: HostawayReservation): string | null {
+  const full = typeof r.guestName === "string" ? r.guestName.trim() : "";
+  if (full) return full.slice(0, 120);
+  const parts = [r.guestFirstName, r.guestLastName].filter((p): p is string => typeof p === "string" && p.trim() !== "").map((p) => p.trim());
+  return parts.length ? parts.join(" ").slice(0, 120) : null;
+}
+
 function toReservationData(r: HostawayReservation, fin: Record<string, unknown> | null, financeFetchedAt: Date | null) {
   const arrival = toDate(r.arrivalDate)!;
   const departure = toDate(r.departureDate)!;
@@ -209,6 +218,7 @@ function toReservationData(r: HostawayReservation, fin: Record<string, unknown> 
     channel: String(r.channelName ?? "inconnu"),
     channelReservationId: ref ? String(ref) : null,
     status: String(r.status ?? ""),
+    guestName: guestNameOf(r),
     arrivalDate: arrival,
     departureDate: departure,
     reservationDate: toDate(r.reservationDate) ?? toDate(r.insertedOn),

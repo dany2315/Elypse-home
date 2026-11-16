@@ -51,6 +51,7 @@ export async function GET(request: Request) {
     [
       "Arrivée",
       "Départ",
+      "Voyageur",
       "Bien",
       "Plateforme",
       "Statut",
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
     ...lines.map((l) => [
       l.arrival,
       l.departure,
+      l.guestName ?? "",
       l.groupName,
       channelLabel(l.channel),
       statusLabel(l.status),
