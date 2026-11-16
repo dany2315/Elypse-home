@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import { LivretCard } from "@/components/dashboard/livret-card";
+import { requireSession } from "@/lib/auth";
 import { getBaseUrl, livretPath } from "@/lib/base-url";
+import { eur, monthLabel, pct, todayInParis } from "@/lib/finances/filters";
+import { loadLivretMonth } from "@/lib/finances/load";
 import { prisma } from "@/lib/db";
 import { asLocalized } from "@/lib/localized";
 
 export const metadata: Metadata = { title: "Livrets" };
 
 export default async function DashboardPage() {
-  const [livrets, baseUrl] = await Promise.all([
+  // Contrôle dans la page elle-même (le layout seul ne suffit pas) : les chiffres Hostaway sont réservés à l'admin.
+  await requireSession();
+  const [livrets, baseUrl, finance] = await Promise.all([
     prisma.livret.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
@@ -15,7 +20,10 @@ export default async function DashboardPage() {
       },
     }),
     getBaseUrl(),
+    // Chiffres Hostaway du mois : facultatifs, la liste s'affiche même si la lecture échoue.
+    loadLivretMonth(todayInParis()).catch(() => null),
   ]);
+  const month = finance ? monthLabel(finance.month) : "";
 
   const activeCount = livrets.filter((l) => l.active).length;
 
@@ -53,6 +61,20 @@ export default async function DashboardPage() {
                   url: `${baseUrl}${livretPath(l.token)}`,
                   hasWifi: Boolean(l.wifiSsid),
                   hasRules: Boolean(asLocalized(l.rules).fr),
+                  finance: finance
+                    ? (() => {
+                        const f = finance.byLivret[l.id];
+                        if (!f) return { month, linked: false };
+                        return {
+                          month,
+                          linked: true,
+                          gross: eur(f.gross),
+                          payout: eur(f.payout),
+                          occupancy: pct(f.available > 0 ? f.occupied / f.available : null),
+                          href: `/dashboard/finances?${new URLSearchParams({ periode: "mois", annee: finance.month.slice(0, 4), mois: String(Number(finance.month.slice(5))), ...(f.bienKeys.length === 1 ? { bien: f.bienKeys[0] } : {}) })}`,
+                        };
+                      })()
+                    : undefined,
                   counts: {
                     recos: l._count.recommendations,
                     equipements: l._count.equipments,

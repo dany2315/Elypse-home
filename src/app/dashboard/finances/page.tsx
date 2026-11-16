@@ -36,6 +36,8 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
   ]);
   const { main, channels } = buildSections(report, filters);
   const points = trendPoints(trendReport ?? report, trend?.highlight);
+  // Lien « Voir le livret » (aperçu dans le tableau de bord) pour chaque bien relié à un livret.
+  const livretLinks = Object.fromEntries(Object.entries(groups.livretOf).map(([bien, livret]) => [bien, `/dashboard/livrets/${livret}/apercu`]));
   const exportHref = `/dashboard/finances/export?${toSearchParams(filters)}`;
 
   return (
@@ -159,13 +161,18 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       {filters.vue === "reservations" ? (
         <section className="mt-6">
           <h2 className="mb-3 font-serif text-2xl text-ink">Par réservation</h2>
-          <ReservationTable lines={report.reservations} channelColors={channelColors(report)} />
+          <ReservationTable lines={report.reservations} channelColors={channelColors(report)} livretLinks={livretLinks} />
         </section>
       ) : (
         main.map((s) => (
           <section key={s.id} className="mt-6">
             <h2 className="mb-3 font-serif text-2xl text-ink">{s.title}</h2>
-            <FinanceTable firstColumn={s.firstColumn} rows={s.rows} total={s.total} />
+            <FinanceTable
+              firstColumn={s.firstColumn}
+              rows={s.rows}
+              total={s.total}
+              livretLinks={s.id === "biens" ? livretLinks : undefined}
+            />
           </section>
         ))
       )}

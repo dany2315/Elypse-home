@@ -1,3 +1,5 @@
+import { BookOpen } from "lucide-react";
+import Link from "next/link";
 import { eur, int, pct } from "@/lib/finances/filters";
 import { occupancy, type Totals } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
@@ -24,11 +26,14 @@ export function FinanceTable({
   rows,
   total,
   showOccupancy = true,
+  livretLinks,
 }: {
   firstColumn: string;
   rows: TableRow[];
   total: Totals;
   showOccupancy?: boolean;
+  /** Lien « Voir le livret » par ligne (clé de ligne → URL). */
+  livretLinks?: Record<string, string>;
 }) {
   return (
     <div className="overflow-x-auto rounded-3xl border border-border/80 bg-card shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)]">
@@ -53,7 +58,14 @@ export function FinanceTable({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <Row key={r.key} label={r.label} totals={r.totals} showOccupancy={showOccupancy} muted={r.muted} />
+            <Row
+              key={r.key}
+              label={r.label}
+              totals={r.totals}
+              showOccupancy={showOccupancy}
+              muted={r.muted}
+              livretHref={livretLinks?.[r.key]}
+            />
           ))}
         </tbody>
         <tfoot>
@@ -70,12 +82,14 @@ function Row({
   showOccupancy,
   isTotal,
   muted,
+  livretHref,
 }: {
   label: string;
   totals: Totals;
   showOccupancy: boolean;
   isTotal?: boolean;
   muted?: boolean;
+  livretHref?: string;
 }) {
   return (
     <tr
@@ -92,7 +106,18 @@ function Row({
           isTotal ? "bg-night font-serif text-base tracking-wide text-gold-light" : "bg-card",
         )}
       >
-        {label}
+        <span className="flex items-center gap-2">
+          <span className="first-letter:uppercase">{label}</span>
+          {livretHref && (
+            <Link
+              href={livretHref}
+              title="Voir le livret d'accueil de ce logement"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-medium text-gold-deep transition hover:bg-accent"
+            >
+              <BookOpen className="size-3" aria-hidden /> Livret
+            </Link>
+          )}
+        </span>
       </th>
       <td className="px-3 py-3 text-right">{int(totals.stays)}</td>
       <td className="px-3 py-3 text-right">{int(totals.nights)}</td>

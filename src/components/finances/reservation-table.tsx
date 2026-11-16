@@ -5,7 +5,8 @@
  * filtre par plateforme et par statut, tri et détail dépliable. Montants = part de la
  * réservation qui tombe dans la période (selon le mode de rattachement).
  */
-import { ChevronDown, Search } from "lucide-react";
+import { BookOpen, ChevronDown, Search } from "lucide-react";
+import Link from "next/link";
 import { Fragment, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { eur, int } from "@/lib/finances/filters";
@@ -39,8 +40,11 @@ const taxes = (t: Totals) => t.cityTax + t.vat;
 export function ReservationTable({
   lines,
   channelColors,
+  livretLinks = {},
 }: {
   lines: ReservationLine[];
+  /** Lien « Voir le livret » par bien (clé de groupe → URL). */
+  livretLinks?: Record<string, string>;
   /** Couleur de chaque plateforme (mêmes couleurs que le graphique par plateforme). */
   channelColors: Record<string, string>;
 }) {
@@ -207,7 +211,7 @@ export function ReservationTable({
                     {expanded && (
                       <tr className="border-b border-border/60 bg-sand/25">
                         <td colSpan={9} className="px-4 py-4">
-                          <Detail line={l} />
+                          <Detail line={l} livretHref={livretLinks[l.groupKey]} />
                         </td>
                       </tr>
                     )}
@@ -267,7 +271,7 @@ export function ReservationTable({
                   </button>
                   {expanded && (
                     <div className="bg-sand/25 px-4 pt-1 pb-4">
-                      <Detail line={l} />
+                      <Detail line={l} livretHref={livretLinks[l.groupKey]} />
                     </div>
                   )}
                 </li>
@@ -302,7 +306,7 @@ export function ReservationTable({
 }
 
 /** Détail d'une réservation : d'où vient le bénéfice, ligne par ligne. */
-function Detail({ line: l }: { line: ReservationLine }) {
+function Detail({ line: l, livretHref }: { line: ReservationLine; livretHref?: string }) {
   const t = l.totals;
   const rows: [string, string, boolean?][] = [
     ["Chiffre d'affaires", eur(t.gross), true],
@@ -333,6 +337,16 @@ function Detail({ line: l }: { line: ReservationLine }) {
         {l.reservationDate && <Info label="Réservée le" value={full(l.reservationDate)} />}
         <Info label="Référence" value={l.reference ? `${l.reference} · Hostaway ${l.id}` : `Hostaway ${l.id}`} />
       </dl>
+      {livretHref && (
+        <div className="md:col-span-2">
+          <Link
+            href={livretHref}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-gold/40 bg-card px-3 text-sm font-medium text-ink transition hover:bg-accent"
+          >
+            <BookOpen className="size-4 text-gold-deep" aria-hidden /> Voir le livret de {l.groupName}
+          </Link>
+        </div>
+      )}
       {l.prorata && (
         <p className="text-xs text-muted-foreground md:col-span-2">
           Ce séjour commence ou finit en dehors de la période choisie : seules les {l.totals.nights} nuit{plural(l.totals.nights)} passée

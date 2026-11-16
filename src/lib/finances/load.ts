@@ -7,7 +7,13 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 
 export type GroupOption = { key: string; name: string };
 
-export async function loadGroups(): Promise<{ biens: ReportBien[]; listingNames: Record<number, string>; options: GroupOption[] }> {
+export async function loadGroups(): Promise<{
+  biens: ReportBien[];
+  listingNames: Record<number, string>;
+  options: GroupOption[];
+  /** Livret d'accueil relié à chaque bien (clé de groupe → id du livret). */
+  livretOf: Record<string, string>;
+}> {
   const [biens, orphans] = await Promise.all([
     prisma.bien.findMany({
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -19,6 +25,7 @@ export async function loadGroups(): Promise<{ biens: ReportBien[]; listingNames:
   return {
     biens: biens.map((b) => ({ id: b.id, name: b.name, listingIds: b.listings.map((l) => l.id) })),
     listingNames,
+    livretOf: Object.fromEntries(biens.filter((b) => b.livretId).map((b) => [b.id, b.livretId!])),
     options: [
       ...biens.map((b) => ({ key: b.id, name: b.name })),
       ...orphans.map((l) => ({ key: `listing:${l.id}`, name: `${l.internalName || l.name} (non regroupé)` })),
@@ -98,4 +105,31 @@ export async function loadYears(currentYear: number): Promise<number[]> {
   const from = Math.min(agg._min.arrivalDate?.getUTCFullYear() ?? currentYear, currentYear - 1);
   const to = Math.max(agg._max.departureDate?.getUTCFullYear() ?? currentYear, currentYear);
   return Array.from({ length: to - from + 1 }, (_, i) => to - i);
+}
+
+/**
+ * Chiffres du mois en cours pour chaque livret relié à un ou plusieurs biens (nuits passées dans
+ * le mois, annulations seulement si elles rapportent). Clé : id du livret.
+ */
+export async function loadLivretMonth(today: string): Promise<{
+  month: string;
+  byLivret: Record<string, { bienKeys: string[]; gross: number; payout: number; occupied: number; available: number }>;
+}> {
+  const [year, month] = today.split("-").map(Number);
+  const [{ livretOf }, report] = await Promise.all([
+    loadGroups(),
+    loadReport({ periode: "mois", year, month, from: "", to: "", bien: "tous", mode: "sejour", annulations: "versement", vue: "biens" }),
+  ]);
+  const byLivret: Record<string, { bienKeys: string[]; gross: number; payout: number; occupied: number; available: number }> = {};
+  for (const row of report.rows) {
+    const livretId = livretOf[row.key];
+    if (!livretId) continue;
+    const t = (byLivret[livretId] ??= { bienKeys: [], gross: 0, payout: 0, occupied: 0, available: 0 });
+    t.bienKeys.push(row.key);
+    t.gross += row.totals.gross;
+    t.payout += row.totals.payout;
+    t.occupied += row.totals.occupiedNights;
+    t.available += row.totals.availableNights;
+  }
+  return { month: `${year}-${String(month).padStart(2, "0")}`, byLivret };
 }

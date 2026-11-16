@@ -2,6 +2,7 @@
 
 import {
   Bus,
+  ChartColumn,
   Check,
   ExternalLink,
   Eye,
@@ -67,6 +68,10 @@ export type LivretCardData = {
   hasWifi: boolean;
   hasRules: boolean;
   counts: { recos: number; equipements: number; transport: number; contacts: number };
+  /** Chiffres Hostaway du mois en cours (bien relié à ce livret). */
+  finance?:
+    | { month: string; linked: false }
+    | { month: string; linked: true; gross: string; payout: string; occupancy: string; href: string };
 };
 
 const sections = [
@@ -173,6 +178,8 @@ export function LivretCard({ livret }: { livret: LivretCardData }) {
 
         <EmplacementButton url={emplacementUrl(livret.url)} />
 
+        {livret.finance && <FinanceStrip finance={livret.finance} />}
+
         <div className="mt-auto grid grid-cols-4 gap-1.5 border-t pt-4">
           {sections.map(({ tab, label, icon: Icon, key }) => (
             <Link
@@ -195,5 +202,45 @@ export function LivretCard({ livret }: { livret: LivretCardData }) {
       </div>
 
     </article>
+  );
+}
+
+/** Chiffres du mois du logement (Hostaway), avec lien vers la page Finances. */
+function FinanceStrip({ finance }: { finance: NonNullable<LivretCardData["finance"]> }) {
+  if (!finance.linked) {
+    return (
+      <p className="rounded-xl border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground">
+        Aucun bien Hostaway relié à ce livret.{" "}
+        <Link href="/dashboard/finances/biens" className="font-medium text-gold-deep underline-offset-2 hover:underline">
+          Relier un bien
+        </Link>
+      </p>
+    );
+  }
+  return (
+    <Link
+      href={finance.href}
+      className="block rounded-xl border border-gold/30 bg-sand/30 px-3 py-2.5 transition hover:bg-accent/60"
+      aria-label={`Finances de ${finance.month} : chiffre d'affaires ${finance.gross}, bénéfice ${finance.payout}, occupation ${finance.occupancy}`}
+    >
+      <p className="flex items-center justify-between text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+        <span>{finance.month}</span>
+        <ChartColumn className="size-3.5 text-gold-deep" aria-hidden />
+      </p>
+      <dl className="mt-1.5 grid grid-cols-3 gap-2">
+        <div className="min-w-0">
+          <dt className="text-[11px] text-muted-foreground">Chiffre d&apos;affaires</dt>
+          <dd className="truncate text-sm font-medium text-ink tabular-nums">{finance.gross}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[11px] text-muted-foreground">Bénéfice</dt>
+          <dd className="truncate text-sm font-semibold text-ink tabular-nums">{finance.payout}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-[11px] text-muted-foreground">Occupation</dt>
+          <dd className="truncate text-sm font-medium text-ink tabular-nums">{finance.occupancy}</dd>
+        </div>
+      </dl>
+    </Link>
   );
 }
