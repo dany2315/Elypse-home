@@ -64,15 +64,21 @@ export function bienBars(report: Report) {
 }
 
 export function channelShares(report: Report) {
-  return report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.totals.gross }));
+  return report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), value: c.totals.gross, color: channelColor(c.channel) }));
 }
 
-/** Couleurs des plateformes, dans l'ordre du graphique « par plateforme » (bleu, or, violet, puis gris). */
+/**
+ * Couleur de chaque plateforme, reprise de son identité : Airbnb rouge, Booking.com bleu,
+ * réservations directes dans l'or Elypse ; gris pour les autres.
+ */
+const CHANNEL_COLORS: Record<string, string> = {
+  airbnbOfficial: "#ff385c",
+  airbnb: "#ff385c",
+  bookingcom: "#003b95",
+  direct: "#c9a45c",
+};
+export const channelColor = (channel: string) => CHANNEL_COLORS[channel] ?? "#a9aebd";
+
 export function channelColors(report: Report): Record<string, string> {
-  const palette = ["#3a5bc7", "#c9a45c", "#7a6fd6"];
-  return Object.fromEntries(
-    channelShares(report)
-      .filter((c) => c.value > 0)
-      .map((c, i) => [c.key, palette[i] ?? "#a9aebd"]),
-  );
+  return Object.fromEntries(report.byChannel.map((c) => [c.channel, channelColor(c.channel)]));
 }

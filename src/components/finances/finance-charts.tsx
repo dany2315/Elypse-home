@@ -6,6 +6,8 @@
  * bleu #3a5bc7 · or #c9a45c · violet #7a6fd6. L'or est sous 3:1 de contraste : les valeurs
  * restent lisibles par les étiquettes, les infobulles et les tableaux de la page.
  * Taxes en gris neutre #a9aebd : elles ne sont pas à vous (reversées à la ville / l'État).
+ * Plateformes : couleurs fixes reprises de leur identité (Airbnb rouge, Booking bleu, direct or),
+ * définies dans src/lib/finances/charts.ts (channelColor).
  * L'app n'a pas de thème sombre : seul le mode clair est défini.
  */
 import { useId, useRef, useState } from "react";
@@ -23,7 +25,7 @@ export type TrendPoint = {
   highlight?: boolean;
 };
 export type BarItem = { key: string; label: string; value: number; detail?: string };
-export type ShareItem = { key: string; label: string; value: number };
+export type ShareItem = { key: string; label: string; value: number; color?: string };
 
 const SERIES = [
   { key: "payout", label: "Bénéfice", color: "#3a5bc7", ink: "#ffffff" },
@@ -310,10 +312,13 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
 /* --------------------------- Barre segmentée haute -------------------------- */
 
 const SHARE_COLORS = [SERIES[0], SERIES[1], SERIES[2]];
+/** Couleur d'une part : celle de la plateforme si fournie, sinon la palette. Texte blanc sur fond foncé. */
+const shareColor = (p: ShareItem, i: number) => p.color ?? SHARE_COLORS[i]?.color ?? "#a9aebd";
+const shareInk = (bg: string) => (["#c9a45c", "#a9aebd"].includes(bg) ? "#12162a" : "#ffffff");
 
 
 export function ShareBar({ items, title, subtitle, className }: { items: ShareItem[]; title: string; subtitle?: string; className?: string }) {
-  const parts = items.filter((i) => i.value > 0).slice(0, 3);
+  const parts = items.filter((i) => i.value > 0).slice(0, 4);
   const total = parts.reduce((a, b) => a + b.value, 0);
   const [hover, setHover] = useState<string | null>(null);
   const active = parts.find((p) => p.key === hover);
@@ -326,7 +331,7 @@ export function ShareBar({ items, title, subtitle, className }: { items: ShareIt
           <div className="flex h-7 gap-[2px]" role="img" aria-label={parts.map((p) => `${p.label} ${pctFmt.format(p.value / total)}`).join(", ")}>
             {parts.map((p, i) => {
               const share = p.value / total;
-              const c = SHARE_COLORS[i];
+              const bg = shareColor(p, i);
               return (
                 <div
                   key={p.key}
@@ -337,7 +342,7 @@ export function ShareBar({ items, title, subtitle, className }: { items: ShareIt
                   onBlur={() => setHover(null)}
                   aria-label={`${p.label} : ${eur(p.value)} (${pctFmt.format(share)})`}
                   className="flex items-center overflow-visible rounded-[4px] px-2 text-xs font-semibold outline-none transition-[filter] hover:brightness-110 focus-visible:ring-2 focus-visible:ring-gold/60"
-                  style={{ flexGrow: p.value, flexBasis: 0, background: c.color, color: c.ink }}
+                  style={{ flexGrow: p.value, flexBasis: 0, background: bg, color: shareInk(bg) }}
                 >
                   {/* Part imprimée seulement si le bloc est assez large */}
                   {share >= 0.12 && nb(pctFmt.format(share))}
@@ -348,7 +353,7 @@ export function ShareBar({ items, title, subtitle, className }: { items: ShareIt
           <ul className="mt-4 space-y-2 text-sm">
             {parts.map((p, i) => (
               <li key={p.key} className={cn("flex items-center gap-2 rounded-md px-1 transition", active?.key === p.key && "bg-accent/60")}>
-                <span className="size-2.5 rounded-[3px]" style={{ background: SHARE_COLORS[i].color }} aria-hidden />
+                <span className="size-2.5 rounded-[3px]" style={{ background: shareColor(p, i) }} aria-hidden />
                 <span className="text-ink/85">{p.label}</span>
                 <span className="ml-auto font-semibold text-ink tabular-nums">{eur(p.value)}</span>
                 <span className="w-10 text-right text-xs text-muted-foreground tabular-nums">{nb(pctFmt.format(p.value / total))}</span>
