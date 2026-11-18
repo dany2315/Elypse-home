@@ -47,6 +47,7 @@ export default async function BiensPage() {
           id: b.id,
           name: b.name,
           livretId: b.livretId,
+          excluded: b.excludedFromReports,
           listings: b.listings.map((l) => ({
             id: l.id,
             name: l.internalName || l.name,

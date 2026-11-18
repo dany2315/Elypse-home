@@ -1,6 +1,7 @@
 /** Chargement des données Finances depuis la base (côté serveur, aucun appel Hostaway). */
 import { prisma } from "@/lib/db";
 import { toPeriod, type FinanceFilters } from "./filters";
+import type { ReportCharge } from "./charges";
 import { buildReport, periodRange, type Report, type ReportBien } from "./report";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -13,6 +14,8 @@ export async function loadGroups(): Promise<{
   options: GroupOption[];
   /** Livret d'accueil relié à chaque bien (clé de groupe → id du livret). */
   livretOf: Record<string, string>;
+  /** Biens retirés des calculs. */
+  excluded: string[];
 }> {
   const [biens, orphans] = await Promise.all([
     prisma.bien.findMany({
@@ -26,21 +29,50 @@ export async function loadGroups(): Promise<{
     biens: biens.map((b) => ({ id: b.id, name: b.name, listingIds: b.listings.map((l) => l.id) })),
     listingNames,
     livretOf: Object.fromEntries(biens.filter((b) => b.livretId).map((b) => [b.id, b.livretId!])),
+    excluded: biens.filter((b) => b.excludedFromReports).map((b) => b.id),
     options: [
-      ...biens.map((b) => ({ key: b.id, name: b.name })),
+      ...biens.map((b) => ({ key: b.id, name: b.excludedFromReports ? `${b.name} (exclu des calculs)` : b.name })),
       ...orphans.map((l) => ({ key: `listing:${l.id}`, name: `${l.internalName || l.name} (non regroupé)` })),
     ],
   };
 }
 
-export async function loadReport(f: FinanceFilters): Promise<Report> {
+/** Charges fixes de tous les biens, avec leurs versions. */
+export async function loadCharges(): Promise<ReportCharge[]> {
+  const charges = await prisma.bienCharge.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    include: { versions: true },
+  });
+  return charges.map((c) => ({
+    id: c.id,
+    bienId: c.bienId,
+    category: c.category,
+    label: c.label,
+    versions: c.versions.map((v) => ({
+      id: v.id,
+      start: iso(v.startDate),
+      end: v.endDate ? iso(v.endDate) : null,
+      amountCents: v.amountCents,
+      vatRateBp: v.vatRateBp,
+      createdAt: v.createdAt.toISOString(),
+      note: v.note,
+    })),
+  }));
+}
+
+/**
+ * Rapport de la période. `includeExcluded` : compter aussi les biens retirés des calculs
+ * (chiffres d'un livret, qui concernent son propre bien).
+ */
+export async function loadReport(f: FinanceFilters, opts: { includeExcluded?: boolean } = {}): Promise<Report> {
   const period = toPeriod(f);
   const range = periodRange(period);
   const start = new Date(`${range.start}T00:00:00Z`);
   const end = new Date(`${range.end}T00:00:00Z`);
 
-  const [{ biens, listingNames }, rows] = await Promise.all([
+  const [{ biens, listingNames, excluded }, charges, rows] = await Promise.all([
     loadGroups(),
+    loadCharges(),
     prisma.reservation.findMany({
       where: {
         status: { in: ["new", "modified", "cancelled"] },
@@ -85,6 +117,8 @@ export async function loadReport(f: FinanceFilters): Promise<Report> {
     })),
     biens,
     listingNames,
+    charges,
+    excluded: opts.includeExcluded ? [] : excluded,
     period,
     mode: f.mode,
     cancellations: f.annulations,
@@ -109,25 +143,29 @@ export async function loadYears(currentYear: number): Promise<number[]> {
 
 /**
  * Chiffres du mois en cours pour chaque livret relié à un ou plusieurs biens (nuits passées dans
- * le mois, annulations seulement si elles rapportent). Clé : id du livret.
+ * le mois, annulations seulement si elles rapportent, charges déduites, biens exclus compris).
+ * Clé : id du livret.
  */
 export async function loadLivretMonth(today: string): Promise<{
   month: string;
-  byLivret: Record<string, { bienKeys: string[]; gross: number; payout: number; occupied: number; available: number }>;
+  byLivret: Record<string, { bienKeys: string[]; gross: number; profit: number; occupied: number; available: number }>;
 }> {
   const [year, month] = today.split("-").map(Number);
   const [{ livretOf }, report] = await Promise.all([
     loadGroups(),
-    loadReport({ periode: "mois", year, month, from: "", to: "", bien: "tous", mode: "sejour", annulations: "versement", vue: "biens" }),
+    loadReport(
+      { periode: "mois", year, month, from: "", to: "", bien: "tous", mode: "sejour", annulations: "versement", vue: "biens" },
+      { includeExcluded: true },
+    ),
   ]);
-  const byLivret: Record<string, { bienKeys: string[]; gross: number; payout: number; occupied: number; available: number }> = {};
+  const byLivret: Record<string, { bienKeys: string[]; gross: number; profit: number; occupied: number; available: number }> = {};
   for (const row of report.rows) {
     const livretId = livretOf[row.key];
     if (!livretId) continue;
-    const t = (byLivret[livretId] ??= { bienKeys: [], gross: 0, payout: 0, occupied: 0, available: 0 });
+    const t = (byLivret[livretId] ??= { bienKeys: [], gross: 0, profit: 0, occupied: 0, available: 0 });
     t.bienKeys.push(row.key);
     t.gross += row.totals.gross;
-    t.payout += row.totals.payout;
+    t.profit += row.totals.profit;
     t.occupied += row.totals.occupiedNights;
     t.available += row.totals.availableNights;
   }

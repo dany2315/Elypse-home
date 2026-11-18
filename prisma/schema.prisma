@@ -250,17 +250,61 @@ model Contact {
 /// Logement physique : regroupe un ou plusieurs listings Hostaway (ex. une annonce
 /// Booking par listing). Les rapports financiers sont faits par bien.
 model Bien {
-  id        String            @id @default(uuid())
-  name      String
-  livretId  String?
-  livret    Livret?           @relation(fields: [livretId], references: [id], onDelete: SetNull)
-  listings  HostawayListing[]
-  sortOrder Int               @default(0)
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id                  String            @id @default(uuid())
+  name                String
+  livretId            String?
+  livret              Livret?           @relation(fields: [livretId], references: [id], onDelete: SetNull)
+  listings            HostawayListing[]
+  /// true : bien retiré des calculs du rapport financier (totaux, graphiques, export).
+  excludedFromReports Boolean           @default(false)
+  /// Charges fixes saisies à la main (loyer, leasing mobilier, électricité…).
+  charges             BienCharge[]
+  sortOrder           Int               @default(0)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   @@index([livretId])
   @@map("bien")
+}
+
+/// Charge fixe mensuelle d'un bien, saisie à la main dans le tableau de bord.
+/// Son montant est porté par des versions datées : une modification s'applique à partir d'une
+/// date choisie (et jusqu'à une date facultative), sans toucher aux mois précédents.
+model BienCharge {
+  id        String              @id @default(uuid())
+  bienId    String
+  bien      Bien                @relation(fields: [bienId], references: [id], onDelete: Cascade)
+  /// loyer | leasing | electricite | internet | assurance | copropriete | menage | autre
+  category  String              @default("autre")
+  label     String
+  sortOrder Int                 @default(0)
+  versions  BienChargeVersion[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@index([bienId])
+  @@map("bien_charge")
+}
+
+/// Montant d'une charge sur une période. Une version n'est jamais modifiée : chaque changement
+/// en crée une nouvelle (historique). Sur un même jour, la version saisie en dernier l'emporte.
+model BienChargeVersion {
+  id          String     @id @default(uuid())
+  chargeId    String
+  charge      BienCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  /// Premier jour concerné.
+  startDate   DateTime   @db.Date
+  /// Dernier jour concerné (inclus) ; null = sans fin.
+  endDate     DateTime?  @db.Date
+  /// Montant mensuel hors taxes, en centimes (0 = charge arrêtée).
+  amountCents Int
+  /// Taux de TVA en points de base (2000 = 20 %).
+  vatRateBp   Int        @default(0)
+  note        String     @default("")
+  createdAt   DateTime   @default(now())
+
+  @@index([chargeId])
+  @@map("bien_charge_version")
 }
 
 model HostawayListing {

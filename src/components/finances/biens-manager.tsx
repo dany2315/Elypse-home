@@ -3,15 +3,17 @@
 import { BookOpen, Combine, Loader2, Unlink, Wand2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { detachListing, mergeBiens, proposeBiens, renameBien, setBienLivret } from "@/app/dashboard/finances/actions";
+import { detachListing, mergeBiens, proposeBiens, renameBien, setBienExcluded, setBienLivret } from "@/app/dashboard/finances/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { channelLabel } from "@/lib/finances/report";
+import { cn } from "@/lib/utils";
 
 type Listing = { id: number; name: string; publicName: string; channels: string[]; active: boolean; reservations: number };
-type Bien = { id: string; name: string; livretId: string | null; listings: Listing[] };
+type Bien = { id: string; name: string; livretId: string | null; excluded: boolean; listings: Listing[] };
 
 type Props = { biens: Bien[]; livrets: { id: string; name: string }[]; orphanCount: number };
 
@@ -76,7 +78,12 @@ function BienCard({
   const others = biens.filter((o) => o.id !== bien.id);
 
   return (
-    <article className="rounded-3xl border border-border/80 bg-card p-5 shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)]">
+    <article
+      className={cn(
+        "rounded-3xl border border-border/80 bg-card p-5 shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)]",
+        bien.excluded && "border-dashed bg-card/60",
+      )}
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
         <label className="flex flex-1 flex-col gap-1.5">
           <span className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">Nom du bien</span>
@@ -140,6 +147,25 @@ function BienCard({
         )}
         {pending && <Loader2 className="mb-2.5 size-4 animate-spin text-gold-deep" />}
       </div>
+
+      <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl bg-sand/40 px-4 py-3">
+        <Switch
+          checked={!bien.excluded}
+          disabled={pending}
+          onCheckedChange={(on) =>
+            run(() => setBienExcluded(bien.id, !on), on ? `« ${bien.name} » compté dans les finances` : `« ${bien.name} » retiré des calculs`)
+          }
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-ink">{bien.excluded ? "Exclu des calculs financiers" : "Compté dans les finances"}</span>
+          <span className="block text-xs text-muted-foreground">
+            {bien.excluded
+              ? "Ses réservations et ses charges ne sont pas dans les totaux, les graphiques ni l'export. Vous pouvez toujours le consulter seul en le choisissant dans le filtre « Bien »."
+              : "Désactivez pour retirer ce bien des totaux, des graphiques et de l'export (bien que vous ne gérez plus, logement personnel…)."}
+          </span>
+        </span>
+      </label>
 
       <ul className="mt-4 divide-y divide-border/60 rounded-2xl border border-border/60">
         {bien.listings.map((l) => (

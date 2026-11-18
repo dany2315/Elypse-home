@@ -6,6 +6,7 @@
  * bleu #3a5bc7 · or #c9a45c · violet #7a6fd6. L'or est sous 3:1 de contraste : les valeurs
  * restent lisibles par les étiquettes, les infobulles et les tableaux de la page.
  * Taxes en gris neutre #a9aebd : elles ne sont pas à vous (reversées à la ville / l'État).
+ * Charges fixes (loyer, leasing…) en terre cuite #d0694a.
  * Plateformes : couleurs fixes reprises de leur identité (Airbnb rouge, Booking bleu, direct or),
  * définies dans src/lib/finances/charts.ts (channelColor).
  * L'app n'a pas de thème sombre : seul le mode clair est défini.
@@ -17,7 +18,10 @@ export type TrendPoint = {
   key: string;
   label: string;
   shortLabel: string;
+  gross: number;
+  /** Bénéfice après charges (peut être négatif). */
   payout: number;
+  charges: number;
   fees: number;
   refunds: number;
   taxes: number;
@@ -29,6 +33,7 @@ export type ShareItem = { key: string; label: string; value: number; color?: str
 
 const SERIES = [
   { key: "payout", label: "Bénéfice", color: "#3a5bc7", ink: "#ffffff" },
+  { key: "charges", label: "Vos charges", color: "#d0694a", ink: "#ffffff" },
   { key: "fees", label: "Commissions et frais", color: "#c9a45c", ink: "#12162a" },
   { key: "refunds", label: "Remboursements", color: "#7a6fd6", ink: "#ffffff" },
   { key: "taxes", label: "Taxes (séjour, TVA)", color: "#a9aebd", ink: "#12162a" },
@@ -40,6 +45,19 @@ const pctFmt = new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractio
 const nb = (s: string) => s.replace(/ /g, " ");
 const eur = (cents: number) => nb(eurFmt.format(cents / 100));
 const eurCompact = (cents: number) => `${nb(compactFmt.format(cents / 100))} €`;
+
+/**
+ * Parts dessinées d'une colonne (hauteur = chiffre d'affaires). Un bénéfice négatif (charges
+ * plus fortes que le net) n'est pas dessiné et les charges sont coupées au net : la colonne garde
+ * la hauteur du chiffre d'affaires. Les infobulles donnent les vrais montants.
+ */
+function drawn(p: TrendPoint) {
+  const net = Math.max(0, p.gross - p.fees - p.refunds - p.taxes);
+  return SERIES.map((s) => {
+    const value = s.key === "payout" ? Math.max(0, p.payout) : s.key === "charges" ? Math.min(p.charges, net) : p[s.key];
+    return { ...s, value };
+  }).filter((s) => s.value > 0);
+}
 
 /** Graduations « propres » (1, 2, 2,5, 5 × 10ⁿ) couvrant `max`. */
 function niceTicks(max: number, count = 4): number[] {
@@ -87,7 +105,7 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
   const [tip, setTip] = useState<Tip>(null);
   const frame = useRef<HTMLDivElement>(null);
   const id = useId();
-  const totals = points.map((p) => p.payout + p.fees + p.refunds + p.taxes);
+  const totals = points.map((p) => Math.max(0, p.gross));
   const ticks = niceTicks(Math.max(0, ...totals));
   const top = ticks[ticks.length - 1] || 1;
   const maxIndex = totals.indexOf(Math.max(...totals));
@@ -128,14 +146,14 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
             <div className="relative flex items-end" style={{ height: H }} role="list" aria-label={title}>
               {points.map((p, i) => {
                 const total = totals[i];
-                const segments = SERIES.map((s) => ({ ...s, value: p[s.key] })).filter((s) => s.value > 0);
+                const segments = drawn(p);
                 return (
                   <div
                     key={p.key}
                     role="listitem"
                     tabIndex={0}
                     aria-describedby={tip?.point.key === p.key ? `${id}-tip` : undefined}
-                    aria-label={`${p.label} : chiffre d'affaires ${eur(total)}, bénéfice ${eur(p.payout)}, commissions et frais ${eur(p.fees)}, remboursements ${eur(p.refunds)}, taxes ${eur(p.taxes)}`}
+                    aria-label={`${p.label} : chiffre d'affaires ${eur(total)}, bénéfice ${eur(p.payout)}, charges ${eur(p.charges)}, commissions et frais ${eur(p.fees)}, remboursements ${eur(p.refunds)}, taxes ${eur(p.taxes)}`}
                     onPointerEnter={(e) => show(e, p)}
                     onFocus={(e) => show(e, p)}
                     onBlur={() => setTip(null)}
@@ -189,13 +207,13 @@ export function TrendChart({ points, title, subtitle, className }: { points: Tre
             <p className="font-medium text-ink first-letter:uppercase">{tip.point.label}</p>
             <p className="mt-0.5 text-muted-foreground">
               {tip.point.stays} séjour{tip.point.stays > 1 ? "s" : ""} · chiffre d&apos;affaires{" "}
-              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.payout + tip.point.fees + tip.point.refunds + tip.point.taxes)}</span>
+              <span className="font-semibold text-ink tabular-nums">{eur(tip.point.gross)}</span>
             </p>
             <ul className="mt-2 space-y-1">
               {[...SERIES].reverse().map((s) => (
                 <li key={s.key} className="flex items-center gap-2">
                   <span className="h-0.5 w-3 rounded-full" style={{ background: s.color }} aria-hidden />
-                  <span className="font-semibold text-ink tabular-nums">{eur(tip.point[s.key])}</span>
+                  <span className={cn("font-semibold tabular-nums", tip.point[s.key] < 0 ? "text-destructive" : "text-ink")}>{eur(tip.point[s.key])}</span>
                   <span className="truncate text-muted-foreground">{s.label}</span>
                 </li>
               ))}
@@ -214,7 +232,7 @@ function MobileTrend({ points, totals }: { points: TrendPoint[]; totals: number[
   return (
     <ul className="mt-4 space-y-1.5 sm:hidden">
       {points.map((p, i) => {
-        const segments = SERIES.map((s) => ({ ...s, value: p[s.key] })).filter((s) => s.value > 0);
+        const segments = drawn(p);
         const expanded = open === p.key;
         return (
           <li key={p.key}>
@@ -251,7 +269,7 @@ function MobileTrend({ points, totals }: { points: TrendPoint[]; totals: number[
                   {SERIES.map((s) => (
                     <li key={s.key} className="flex items-center gap-2">
                       <span className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: s.color }} aria-hidden />
-                      <span className="font-semibold text-ink tabular-nums">{eur(p[s.key])}</span>
+                      <span className={cn("font-semibold tabular-nums", p[s.key] < 0 ? "text-destructive" : "text-ink")}>{eur(p[s.key])}</span>
                       <span className="truncate text-muted-foreground">{s.label}</span>
                     </li>
                   ))}
@@ -268,7 +286,8 @@ function MobileTrend({ points, totals }: { points: TrendPoint[]; totals: number[
 /* ----------------------- Barres horizontales classées ---------------------- */
 
 export function RankedBars({ items, title, subtitle, className }: { items: BarItem[]; title: string; subtitle?: string; className?: string }) {
-  const sorted = [...items].filter((i) => i.value > 0).sort((a, b) => b.value - a.value);
+  // Bénéfice négatif (charges plus fortes que le net) : listé en bas, sans barre, en rouge.
+  const sorted = [...items].filter((i) => i.value !== 0).sort((a, b) => b.value - a.value);
   const max = Math.max(1, ...sorted.map((i) => i.value));
   const [hover, setHover] = useState<string | null>(null);
   return (
@@ -293,10 +312,12 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
                 <span className="min-w-0 flex-1">
                   <span
                     className="block h-3.5 rounded-r-[4px] transition-[filter]"
-                    style={{ width: `${(i.value / max) * 100}%`, background: SERIES[0].color, filter: hover === i.key ? "brightness(1.12)" : undefined }}
+                    style={{ width: `${(Math.max(0, i.value) / max) * 100}%`, background: SERIES[0].color, filter: hover === i.key ? "brightness(1.12)" : undefined }}
                   />
                 </span>
-                <span className="text-xs font-semibold whitespace-nowrap text-ink tabular-nums">{eurCompact(i.value)}</span>
+                <span className={cn("text-xs font-semibold whitespace-nowrap tabular-nums", i.value < 0 ? "text-destructive" : "text-ink")}>
+                  {i.value < 0 ? `− ${eurCompact(-i.value)}` : eurCompact(i.value)}
+                </span>
                 {hover === i.key && i.detail && (
                   <span className="hidden text-xs whitespace-nowrap text-muted-foreground lg:inline">· {i.detail}</span>
                 )}
@@ -311,7 +332,7 @@ export function RankedBars({ items, title, subtitle, className }: { items: BarIt
 
 /* --------------------------- Barre segmentée haute -------------------------- */
 
-const SHARE_COLORS = [SERIES[0], SERIES[1], SERIES[2]];
+const SHARE_COLORS = [SERIES[0], SERIES[2], SERIES[3]];
 /** Couleur d'une part : celle de la plateforme si fournie, sinon la palette. Texte blanc sur fond foncé. */
 const shareColor = (p: ShareItem, i: number) => p.color ?? SHARE_COLORS[i]?.color ?? "#a9aebd";
 const shareInk = (bg: string) => (["#c9a45c", "#a9aebd"].includes(bg) ? "#12162a" : "#ffffff");

@@ -10,9 +10,13 @@
  *                    séjours à venir inclus.
  *  - "arrivee"     : tout à la tranche du jour d'arrivée.
  *  - "reservation" : tout à la tranche de la date de réservation.
+ * Charges fixes (saisies à la main, voir charges.ts) : réparties au jour dans chaque tranche,
+ * quel que soit le mode. Bénéfice = net des plateformes − charges TTC.
  * Montants en centimes. Le prorata est arrondi en cumulé depuis l'arrivée : la somme des
  * tranches (et de périodes adjacentes) redonne exactement le montant de la réservation.
  */
+
+import { chargeInRange, chargeSegments, type ReportCharge } from "./charges";
 
 export type Mode = "sejour" | "arrivee" | "reservation";
 export type CancelFilter = "versement" | "toutes" | "aucune";
@@ -111,14 +115,20 @@ export type Totals = {
   /** Remboursements aux voyageurs. */
   refunds: number;
   /**
-   * Bénéfice : ce qui reste réellement = CA − commissions − frais de paiement − remboursements
-   * − taxe de séjour − TVA (= CA hors taxes − commissions − frais de paiement − remboursements).
+   * Net des plateformes : CA − commissions − frais de paiement − remboursements − taxe de séjour
+   * − TVA (= CA hors taxes − commissions − frais de paiement − remboursements). Avant vos charges.
    */
   payout: number;
   cityTax: number;
   /** TVA et autres taxes. */
   vat: number;
   cleaning: number;
+  /** Charges fixes saisies (loyer, leasing, électricité…) : hors taxes, TVA, TTC. */
+  chargesHT: number;
+  chargesVat: number;
+  charges: number;
+  /** Bénéfice : ce qui reste réellement = net des plateformes − charges TTC. */
+  profit: number;
   stays: number;
   nights: number;
   /** Nuits occupées dans la période (calendrier, quel que soit le mode). */
@@ -162,8 +172,15 @@ export type ReservationLine = {
   prorata: boolean;
 };
 
+/** Charge comptée dans la période, pour un bien. */
+export type ChargeLine = { id: string; bienKey: string; bienName: string; category: string; label: string; ht: number; vat: number };
+
 export type Report = {
   buckets: Bucket[];
+  /** Charges fixes de la période (montant non nul), par bien. */
+  charges: ChargeLine[];
+  /** Biens retirés des calculs (réglage du bien), non comptés dans le rapport global. */
+  excluded: { key: string; name: string }[];
   /** Réservations comptées dans la période, par date d'arrivée. */
   reservations: ReservationLine[];
   rows: ReportRow[];
@@ -186,6 +203,10 @@ export type ReportInput = {
   cancellations: CancelFilter;
   /** Limiter à un bien (id de bien, ou "listing:<id>"). */
   groupKey?: string;
+  /** Charges fixes des biens. */
+  charges?: ReportCharge[];
+  /** Biens retirés des calculs ; un bien exclu reste visible s'il est choisi seul (groupKey). */
+  excluded?: string[];
 };
 
 const CONFIRMED = new Set(["new", "modified"]);
@@ -315,6 +336,8 @@ class Acc {
   cityTax = 0;
   vat = 0;
   cleaning = 0;
+  chargesHT = 0;
+  chargesVat = 0;
   nights = 0;
   occupiedNights = 0;
   ids = new Set<number>();
@@ -332,6 +355,8 @@ class Acc {
   }
 
   totals(availableNights: number): Totals {
+    const payout = this.revenue - this.commission - this.paymentFees - this.refunds;
+    const charges = this.chargesHT + this.chargesVat;
     return {
       gross: this.revenue + this.cityTax + this.vat,
       revenue: this.revenue,
@@ -339,10 +364,14 @@ class Acc {
       paymentFees: this.paymentFees,
       refunds: this.refunds,
       // Revenu net dérivé : identique à la somme des revenus nets des réservations.
-      payout: this.revenue - this.commission - this.paymentFees - this.refunds,
+      payout,
       cityTax: this.cityTax,
       vat: this.vat,
       cleaning: this.cleaning,
+      chargesHT: this.chargesHT,
+      chargesVat: this.chargesVat,
+      charges,
+      profit: payout - charges,
       stays: this.ids.size,
       nights: this.nights,
       occupiedNights: this.occupiedNights,
@@ -406,10 +435,14 @@ export function buildReport(input: ReportInput): Report {
     return key;
   };
 
+  // Biens exclus : ignorés, sauf si on regarde ce bien seul.
+  const excluded = new Set(input.excluded ?? []);
+  const skipGroup = (g: string) => (input.groupKey ? g !== input.groupKey : excluded.has(g));
+
   const { kept, duplicates } = dedupe(input.reservations);
   const accs = new Map<string, Acc>();
   const acc = (k: string) => accs.get(k) ?? accs.set(k, new Acc()).get(k)!;
-  const usedGroups = new Set<string>(input.biens.map((b) => b.id));
+  const usedGroups = new Set<string>(input.biens.map((b) => b.id).filter((g) => !skipGroup(g)));
 
   let cancelledIncluded = 0;
   let cancelledExcluded = 0;
@@ -417,7 +450,7 @@ export function buildReport(input: ReportInput): Report {
 
   for (const r of kept) {
     const group = groupOf(r.listingId);
-    if (input.groupKey && group !== input.groupKey) continue;
+    if (skipGroup(group)) continue;
 
     // Occupation (calendrier) : séjours confirmés uniquement, quel que soit le mode.
     if (CONFIRMED.has(r.status)) {
@@ -461,8 +494,30 @@ export function buildReport(input: ReportInput): Report {
     });
   }
 
+  // Charges fixes : réparties au jour dans chaque tranche.
+  const chargeLines: ChargeLine[] = [];
+  for (const c of input.charges ?? []) {
+    if (skipGroup(c.bienId) || !groupNames.has(c.bienId)) continue;
+    const segments = chargeSegments(c.versions);
+    const line = { ht: 0, vat: 0 };
+    for (const b of buckets) {
+      const { ht, vat } = chargeInRange(segments, b.start, b.end);
+      if (ht === 0 && vat === 0) continue;
+      line.ht += ht;
+      line.vat += vat;
+      for (const k of [`${c.bienId}|${b.key}`, `${c.bienId}|*`, `*|${b.key}`, "*|*"]) {
+        acc(k).chargesHT += ht;
+        acc(k).chargesVat += vat;
+      }
+    }
+    if (line.ht || line.vat) {
+      usedGroups.add(c.bienId);
+      chargeLines.push({ id: c.id, bienKey: c.bienId, bienName: groupNames.get(c.bienId)!, category: c.category, label: c.label, ...line });
+    }
+  }
+
   const days = buckets.reduce((a, b) => a + b.days, 0);
-  const groups = [...usedGroups].filter((g) => !input.groupKey || g === input.groupKey);
+  const groups = [...usedGroups].filter((g) => !skipGroup(g));
   const get = (k: string, available: number) => (accs.get(k) ?? new Acc()).totals(available);
 
   const order = new Map(input.biens.map((b, i) => [b.id, i]));
@@ -484,6 +539,8 @@ export function buildReport(input: ReportInput): Report {
 
   return {
     buckets,
+    charges: chargeLines,
+    excluded: input.biens.filter((b) => excluded.has(b.id)).map((b) => ({ key: b.id, name: b.name })),
     reservations: lines,
     rows,
     total: get("*|*", days * groups.length),

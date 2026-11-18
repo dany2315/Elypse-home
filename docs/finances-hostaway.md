@@ -49,7 +49,9 @@ Lecture de l'écran (demande d'Elypse, 16/11/2026) : **chiffre d'affaires** = to
 | **Commissions plateforme** | `f.hostChannelFee` (à défaut `r.channelCommissionAmount`, puis `r.airbnbListingHostFee`) `+ f.guestChannelFee` | `r.channelCommissionAmount` est souvent vide pour Booking (9 réservations sur 19 en octobre) : `f.hostChannelFee` est fiable. |
 | **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee`, à défaut **1,4 % du `totalPrice` pour Booking** | Les champs Hostaway sont toujours vides ; le taux de 1,4 % est le réglage « Frais de traitement du paiement OTA » du compte Hostaway, absent de l'API (vérifié au centime : 1 162,44 € → 16,27 €). Constante `BOOKING_PAYMENT_FEE_RATE` dans `mapping.ts`. |
 | **Remboursements** | `−(f.airbnbClosedResolutionsSum + f.airbnbOpenResolutionsSum)` (séjours confirmés) | Résolutions Airbnb (remboursements aux voyageurs). Hostaway les retire de `totalPrice` : on les rajoute au CA puis on les déduit du revenu net. Pour une annulation, la résolution est le montant conservé et reste dans le CA. |
-| **Bénéfice** (champ `payout`) | `CA − commissions − frais de paiement − remboursements − taxe de séjour − TVA` | Ce qui reste réellement : ce qui est reçu des plateformes, taxes à reverser retirées. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. Bénéfice **avant** les charges non saisies ici (coût du ménage, frais de gestion Elypse…). |
+| **Net des plateformes** (champ `payout` ; « Net » par réservation, « Net avant charges » par plateforme) | `CA − commissions − frais de paiement − remboursements − taxe de séjour − TVA` | Ce qui est reçu des plateformes, taxes à reverser retirées. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. |
+| − Charges (`charges` = `chargesHT` + `chargesVat`) | charges saisies à la main (voir « Charges fixes par bien ») | Loyer, leasing mobilier, électricité… TVA comprise, comptées au jour près. |
+| **Bénéfice** (champ `profit`) | `net des plateformes − charges TTC` | Ce qui reste réellement. |
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
 | **TVA** | `f.vat + f.otherTaxes + f.roomTax + f.lodgingTax + f.hotelTax` (+ `f.salesTax` hors Airbnb) | Collectée en plus du CA (Booking, 10 % sur certains listings). |
 | **dont ménage** | `f.cleaningFeeValue` (à défaut `r.cleaningFee`, puis `r.airbnbListingCleaningFee`) | Inclus dans le CA. Uniquement s'il a été facturé : 39 réservations sur 750. Sinon 0 €. Un frais par séjour, compté au mois d'arrivée. |
@@ -169,6 +171,19 @@ Séjours confirmés d'octobre : `totalPrice` 84 446,90 € · `baseRate` 77 184,
 Les montants du rapport Hostaway ne sont pas lisibles par l'API : à comparer colonne par colonne avec
 l'export du rapport « Activité de location » (même mois, mêmes filtres de statut). Pour regénérer ces
 chiffres : `pnpm tsx --env-file=.env scripts/finances-compare-month.ts 2026-10`.
+
+## Charges fixes par bien (19/11/2026)
+
+Demande d'Elypse : saisir à la main les autres charges de chaque bien (loyer, leasing du mobilier, électricité…), avec la TVA de chaque charge, sans réécrire le passé quand un montant change. Page `/dashboard/finances/charges` (admin connecté), calcul dans `src/lib/finances/charges.ts` (module pur, testé par `charges.test.ts`).
+
+- **Modèle** : `bien_charge` (bien, type, libellé) et `bien_charge_version` (à partir du, jusqu'au facultatif, montant mensuel HT en centimes, taux de TVA en points de base, note, date de saisie). Une version n'est jamais modifiée : « Modifier » crée une nouvelle version à partir d'une date choisie. Sur un même jour, la version saisie en dernier l'emporte ; une version avec une date de fin laisse reprendre la précédente après elle. « Arrêter la charge » = version à 0 €. Supprimer une saisie (erreur de frappe) recalcule sans elle ; la dernière saisie ne se supprime qu'avec la charge.
+- **Calcul** : le montant mensuel est réparti au jour (montant × jours couverts / jours du mois) dans chaque tranche du rapport, quel que soit le mode de rattachement. Un mois entier compte le montant exact ; une année = somme de ses mois. TVA = HT × taux, arrondie par tranche. Les charges ne sont pas réparties par réservation ni par plateforme (tableau des plateformes : « Net avant charges »).
+- **Bénéfice** = net des plateformes − charges **TTC** (ce qui sort réellement de la poche). Si la TVA des charges est récupérée, le choix inverse (déduire le HT) se fait dans `Acc.totals` (`report.ts`).
+- **Export CSV** : colonnes Net avant charges, Charges HT, TVA sur charges, Charges TTC, Bénéfice, et une section « Charges de la période » par bien.
+
+## Biens exclus des calculs (19/11/2026)
+
+`bien.excludedFromReports` (interrupteur « Compté dans les finances » sur `/dashboard/finances/biens`) : les réservations, nuits disponibles et charges du bien sont ignorées dans le rapport de tous les biens (totaux, graphiques, plateformes, export). Le bien reste consultable seul en le choisissant dans le filtre « Bien » (bandeau d'avertissement), et sa carte de livret garde ses propres chiffres du mois. Tables et colonne créées par `prisma/sql/2026-11-finances-4.sql` (appliqué sur staging ; à appliquer en production).
 
 ## Coût du ménage (17/11/2026)
 

@@ -128,6 +128,12 @@ export function monthLabel(key: string, withYear = true): string {
   return withYear ? `${MONTH_NAMES[m - 1]} ${y}` : MONTH_NAMES[m - 1];
 }
 
+/** "2026-03-01" → "1er mars 2026" */
+export function longDate(d: string): string {
+  const [y, m, day] = d.split("-").map(Number);
+  return `${day === 1 ? "1er" : day} ${MONTH_NAMES[m - 1]} ${y}`;
+}
+
 /** "2026-10-15" → "15/10/2026" */
 export const shortDate = (d: string) => d.split("-").reverse().join("/");
 

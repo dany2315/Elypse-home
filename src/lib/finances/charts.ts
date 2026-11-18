@@ -6,7 +6,12 @@ export type ChartTrendPoint = {
   key: string;
   label: string;
   shortLabel: string;
+  /** Chiffre d'affaires (hauteur de la colonne). */
+  gross: number;
+  /** Bénéfice après charges (peut être négatif). */
   payout: number;
+  /** Charges fixes TTC. */
+  charges: number;
   fees: number;
   refunds: number;
   taxes: number;
@@ -44,7 +49,9 @@ export function trendPoints(report: Report, highlight: string[] = []): ChartTren
       key: b.key,
       label: bucketLabel(b, true),
       shortLabel,
-      payout: t.payout,
+      gross: t.gross,
+      payout: t.profit,
+      charges: t.charges,
       fees: t.commission + t.paymentFees,
       refunds: t.refunds,
       taxes: t.cityTax + t.vat,
@@ -58,8 +65,8 @@ export function bienBars(report: Report) {
   return report.rows.map((r) => ({
     key: r.key,
     label: r.name,
-    value: r.totals.payout,
-    detail: `${r.totals.stays} séjour${r.totals.stays > 1 ? "s" : ""} · ${r.totals.nights} nuits`,
+    value: r.totals.profit,
+    detail: `${r.totals.stays} séjour${r.totals.stays > 1 ? "s" : ""} · ${r.totals.nights} nuits${r.totals.charges ? " · charges déduites" : ""}`,
   }));
 }
 

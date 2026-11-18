@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Download, TriangleAlert } from "lucide-react";
+import { Building2, ChevronDown, CircleSlash, Download, Receipt, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankedBars, ShareBar, TrendChart } from "@/components/finances/finance-charts";
@@ -9,7 +9,8 @@ import { SyncButton } from "@/components/finances/sync-button";
 import { Button } from "@/components/ui/button";
 import { requireSession } from "@/lib/auth";
 import { cancelLabel, eur, int, modeLabel, parseFilters, pct, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
-import { occupancy } from "@/lib/finances/report";
+import { chargeCategoryLabel } from "@/lib/finances/charges";
+import { occupancy, type Report } from "@/lib/finances/report";
 import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
 import { bienBars, channelColors, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
 import { buildSections } from "@/lib/finances/views";
@@ -61,6 +62,11 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="lg">
+            <Link href="/dashboard/finances/charges">
+              <Receipt /> Charges
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
             <Link href="/dashboard/finances/biens">
               <Building2 /> Biens et listings
             </Link>
@@ -79,7 +85,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
 
       {/* items-start : ouvrir un détail n'étire pas les autres cartes. */}
-      <section className="mt-8 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mt-8 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <Kpi
           label="Chiffre d'affaires"
           value={eur(report.total.gross)}
@@ -109,15 +115,29 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           ]}
         />
         <Kpi
+          label="Vos charges"
+          value={`− ${eur(report.total.charges)}`}
+          note={report.charges.length ? "Loyer, leasing, électricité… TVA comprise" : "Aucune charge saisie sur la période"}
+          details={report.charges.length ? chargeDetails(report) : undefined}
+          footer={
+            <Link href="/dashboard/finances/charges" className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gold-deep hover:underline">
+              <Receipt className="size-3.5" aria-hidden /> {report.charges.length ? "Gérer les charges" : "Saisir vos charges"}
+            </Link>
+          }
+        />
+        <Kpi
           label="Bénéfice"
-          value={eur(report.total.payout)}
+          value={eur(report.total.profit)}
           note="Ce qui reste réellement pour vous"
           accent
+          negative={report.total.profit < 0}
           details={[
             ["Chiffre d'affaires", eur(report.total.gross)],
             ["− Commissions et frais", eur(report.total.commission + report.total.paymentFees + report.total.refunds)],
             ["− Taxes", eur(report.total.cityTax + report.total.vat)],
-            ["= Bénéfice", eur(report.total.payout)],
+            ["= Net des plateformes", eur(report.total.payout)],
+            ["− Vos charges", eur(report.total.charges)],
+            ["= Bénéfice", eur(report.total.profit)],
           ]}
         />
       </section>
@@ -134,6 +154,23 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         {cancelLabel(filters.annulations)}
         {cancelCounts(report.cancelledIncluded, report.cancelledExcluded)}
       </p>
+      {report.excluded.length > 0 && (
+        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <CircleSlash className="size-4 shrink-0" aria-hidden />
+          <span>
+            Exclu{report.excluded.length > 1 ? "s" : ""} des calculs : {report.excluded.map((b) => b.name).join(", ")} ·{" "}
+            <Link href="/dashboard/finances/biens" className="text-gold-deep hover:underline">
+              modifier
+            </Link>
+          </span>
+        </p>
+      )}
+      {filters.bien !== "tous" && groups.excluded.includes(filters.bien) && (
+        <p className="mt-2 flex items-center gap-2 text-sm text-gold-deep">
+          <CircleSlash className="size-4 shrink-0" aria-hidden /> Ce bien est exclu des calculs : il est affiché seul, mais n&apos;est pas
+          compté dans le rapport de tous les biens.
+        </p>
+      )}
       {report.duplicates > 0 && (
         <p className="mt-2 flex items-center gap-2 text-sm text-gold-deep">
           <TriangleAlert className="size-4" /> {report.duplicates} réservation(s) en double ignorée(s) (même référence plateforme).
@@ -144,7 +181,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         <TrendChart
           className="lg:col-span-5"
           title={trend ? "Évolution sur 12 mois" : "Évolution mois par mois"}
-          subtitle="Hauteur = chiffre d'affaires, découpé en bénéfice + commissions et frais + remboursements + taxes. Survolez une colonne pour le détail."
+          subtitle="Hauteur = chiffre d'affaires, découpé en bénéfice + vos charges + commissions et frais + remboursements + taxes. Survolez une colonne pour le détail."
           points={points}
         />
         {filters.bien === "tous" && (
@@ -160,7 +197,12 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
 
       {filters.vue === "reservations" ? (
         <section className="mt-6">
-          <h2 className="mb-3 font-serif text-2xl text-ink">Par réservation</h2>
+          <h2 className="mb-1 font-serif text-2xl text-ink">Par réservation</h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            « Net » = ce que chaque réservation rapporte après les plateformes et les taxes.
+            {report.total.charges > 0 &&
+              ` Vos charges fixes (${eur(report.total.charges)} sur la période) ne sont pas réparties par réservation : elles sont déduites du bénéfice en haut de page.`}
+          </p>
           <ReservationTable lines={report.reservations} channelColors={channelColors(report)} livretLinks={livretLinks} />
         </section>
       ) : (
@@ -180,7 +222,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <section className="mt-10">
         <h2 className="mb-3 font-serif text-2xl text-ink">{channels.title}</h2>
         {channels.rows.length ? (
-          <FinanceTable firstColumn={channels.firstColumn} rows={channels.rows} total={channels.total} showOccupancy={false} />
+          <FinanceTable firstColumn={channels.firstColumn} rows={channels.rows} total={channels.total} showOccupancy={false} withCharges={false} />
         ) : (
           <p className="text-sm text-muted-foreground">Aucun séjour sur la période.</p>
         )}
@@ -188,10 +230,11 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
 
       <p className="mt-8 max-w-3xl text-xs leading-relaxed text-muted-foreground">
         Chiffre d&apos;affaires : tout ce que les voyageurs ont payé (nuitées, ménage, frais de service, taxe de séjour,
-        TVA), comme les « Revenus de location » Hostaway. Bénéfice = chiffre d&apos;affaires − commissions − frais de
-        paiement − remboursements − taxe de séjour − TVA : ce qui vous reste, avant vos propres charges (coût du ménage,
-        loyer, gestion…), qui ne sont pas dans Hostaway. Les frais de ménage sont payés par les voyageurs et restent dans
-        le bénéfice. Occupation : nuits occupées / nuits du calendrier (nuits bloquées non déduites).
+        TVA), comme les « Revenus de location » Hostaway. Net des plateformes = chiffre d&apos;affaires − commissions −
+        frais de paiement − remboursements − taxe de séjour − TVA. Bénéfice = net des plateformes − vos charges (saisies
+        dans « Charges », TVA comprise, comptées au jour près : du 1er au 15 d&apos;un mois de 30 jours, la moitié du
+        loyer). Les frais de ménage sont payés par les voyageurs et restent dans le bénéfice. Occupation : nuits
+        occupées / nuits du calendrier (nuits bloquées non déduites).
       </p>
     </main>
   );
@@ -208,6 +251,16 @@ function cancelCounts(included: number, excluded: number) {
 
 type Detail = [label: string, value: string];
 
+/** Charges de la période par type (Loyer, Leasing…), puis la TVA comprise. */
+function chargeDetails(report: Report): Detail[] {
+  const byCategory = new Map<string, number>();
+  for (const c of report.charges) byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + c.ht + c.vat);
+  return [
+    ...[...byCategory].sort((a, b) => b[1] - a[1]).map(([c, v]): Detail => [chargeCategoryLabel(c), eur(v)]),
+    ["dont TVA", eur(report.total.chargesVat)],
+  ];
+}
+
 function Activity({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="flex items-baseline gap-2" title={hint}>
@@ -218,11 +271,30 @@ function Activity({ label, value, hint }: { label: string; value: string; hint?:
 }
 
 /** Carte chiffre clé ; « Voir le détail » déplie la décomposition du montant (accordéon natif). */
-function Kpi({ label, value, accent, note, details }: { label: string; value: string; accent?: boolean; note?: string; details?: Detail[] }) {
+function Kpi({
+  label,
+  value,
+  accent,
+  negative,
+  note,
+  details,
+  footer,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+  /** Montant négatif (bénéfice) : en rouge. */
+  negative?: boolean;
+  note?: string;
+  details?: Detail[];
+  footer?: React.ReactNode;
+}) {
   return (
     <div className={accent ? "rounded-3xl border border-gold/40 bg-night p-5 text-ivory" : "rounded-3xl border border-border/80 bg-card p-5"}>
       <p className={`text-[10px] font-semibold tracking-[0.2em] uppercase ${accent ? "text-gold-light" : "text-muted-foreground"}`}>{label}</p>
-      <p className={`mt-2 font-serif text-3xl tabular-nums ${accent ? "text-ivory" : "text-ink"}`}>{value}</p>
+      <p className={`mt-2 font-serif text-3xl tabular-nums ${negative ? (accent ? "text-red-300" : "text-destructive") : accent ? "text-ivory" : "text-ink"}`}>
+        {value}
+      </p>
       {note && <p className={`mt-1.5 text-xs ${accent ? "text-ivory/70" : "text-muted-foreground"}`}>{note}</p>}
       {details && (
         <details className="group mt-3">
@@ -243,6 +315,7 @@ function Kpi({ label, value, accent, note, details }: { label: string; value: st
           </dl>
         </details>
       )}
+      {footer}
     </div>
   );
 }

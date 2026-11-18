@@ -69,7 +69,7 @@ export default async function DashboardPage() {
                           month,
                           linked: true,
                           gross: eur(f.gross),
-                          payout: eur(f.payout),
+                          payout: eur(f.profit),
                           occupancy: pct(f.available > 0 ? f.occupied / f.available : null),
                           href: `/dashboard/finances?${new URLSearchParams({ periode: "mois", annee: finance.month.slice(0, 4), mois: String(Number(finance.month.slice(5))), ...(f.bienKeys.length === 1 ? { bien: f.bienKeys[0] } : {}) })}`,
                         };

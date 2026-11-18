@@ -5,7 +5,7 @@ import { channelLabel, type Report, type Totals } from "./report";
 export type ViewRow = { key: string; label: string; totals: Totals; muted?: boolean };
 export type ViewSection = { id: string; title: string; firstColumn: string; rows: ViewRow[]; total: Totals };
 
-const isEmpty = (t: Totals) => t.stays === 0 && t.revenue === 0 && t.occupiedNights === 0;
+const isEmpty = (t: Totals) => t.stays === 0 && t.revenue === 0 && t.occupiedNights === 0 && t.charges === 0;
 
 export function buildSections(report: Report, f: FinanceFilters): { main: ViewSection[]; channels: ViewSection } {
   const multiYear = new Set(report.buckets.map((b) => b.key.slice(0, 4))).size > 1;
@@ -34,7 +34,8 @@ export function buildSections(report: Report, f: FinanceFilters): { main: ViewSe
     title: "Répartition par plateforme",
     firstColumn: "Plateforme",
     rows: report.byChannel.map((c) => ({ key: c.channel, label: channelLabel(c.channel), totals: c.totals })),
-    total: { ...report.total, occupiedNights: 0, availableNights: 0 },
+    // Les charges fixes ne se répartissent pas par plateforme : le tableau s'arrête au net des plateformes.
+    total: { ...report.total, occupiedNights: 0, availableNights: 0, chargesHT: 0, chargesVat: 0, charges: 0, profit: report.total.payout },
   };
 
   const showMonths = f.periode === "annee" || (f.periode === "dates" && report.buckets.length > 1);

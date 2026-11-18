@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 type Sort = "arrivee" | "benefice" | "ca";
 const SORTS: { value: Sort; label: string }[] = [
   { value: "arrivee", label: "Date d'arrivée" },
-  { value: "benefice", label: "Bénéfice" },
+  { value: "benefice", label: "Net" },
   { value: "ca", label: "Chiffre d'affaires" },
 ];
 const PAGE = 50;
@@ -156,7 +156,7 @@ export function ReservationTable({
                 <th className="px-3 py-3 text-right">Chiffre d&apos;affaires</th>
                 <th className="px-3 py-3 text-right">− Commissions et frais</th>
                 <th className="px-3 py-3 text-right">− Taxes</th>
-                <th className="px-3 py-3 text-right">Bénéfice</th>
+                <th className="px-3 py-3 text-right" title="Ce que la réservation rapporte après plateformes et taxes, avant vos charges fixes">Net</th>
                 <th className="w-10" aria-label="Détail" />
               </tr>
             </thead>
@@ -316,7 +316,7 @@ function Detail({ line: l, livretHref }: { line: ReservationLine; livretHref?: s
     ["− Remboursements", eur(t.refunds)],
     ["− Taxe de séjour", eur(t.cityTax)],
     ["− TVA", eur(t.vat)],
-    ["= Bénéfice", eur(t.payout), true],
+    ["= Net (avant vos charges)", eur(t.payout), true],
   ];
   return (
     <div className="grid gap-x-10 gap-y-4 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">

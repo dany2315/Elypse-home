@@ -1,7 +1,8 @@
 import { requireSession } from "@/lib/auth";
 import { cancelLabel, csvAmount, modeLabel, parseFilters, periodLabel, periodSlug } from "@/lib/finances/filters";
 import { loadReport } from "@/lib/finances/load";
-import { channelLabel, occupancy, statusLabel, type ReservationLine, type Totals } from "@/lib/finances/report";
+import { chargeCategoryLabel } from "@/lib/finances/charges";
+import { channelLabel, occupancy, statusLabel, type ChargeLine, type ReservationLine, type Totals } from "@/lib/finances/report";
 import { buildSections, type ViewSection } from "@/lib/finances/views";
 
 /** Export CSV de la vue affichée (mêmes filtres que /dashboard/finances). */
@@ -22,6 +23,10 @@ export async function GET(request: Request) {
     "Remboursements (€)",
     "Taxe de séjour (€)",
     "TVA (€)",
+    "Net avant charges (€)",
+    "Charges HT (€)",
+    "TVA sur charges (€)",
+    "Charges TTC (€)",
     "Bénéfice (€)",
   ];
   const line = (label: string, t: Totals) => [
@@ -37,6 +42,10 @@ export async function GET(request: Request) {
     csvAmount(t.cityTax),
     csvAmount(t.vat),
     csvAmount(t.payout),
+    csvAmount(t.chargesHT),
+    csvAmount(t.chargesVat),
+    csvAmount(t.charges),
+    csvAmount(t.profit),
   ];
   const section = (s: ViewSection) => [
     [s.title],
@@ -66,7 +75,7 @@ export async function GET(request: Request) {
       "Remboursements (€)",
       "Taxe de séjour (€)",
       "TVA (€)",
-      "Bénéfice (€)",
+      "Net avant charges (€)",
     ],
     ...lines.map((l) => [
       l.arrival,
@@ -91,13 +100,27 @@ export async function GET(request: Request) {
     [],
   ];
 
+  const perCharge = (charges: ChargeLine[]) =>
+    charges.length
+      ? [
+          ["Charges de la période"],
+          ["Bien", "Charge", "Type", "HT (€)", "TVA (€)", "TTC (€)"],
+          ...charges.map((c) => [c.bienName, c.label, chargeCategoryLabel(c.category), csvAmount(c.ht), csvAmount(c.vat), csvAmount(c.ht + c.vat)]),
+          ["Total", "", "", csvAmount(report.total.chargesHT), csvAmount(report.total.chargesVat), csvAmount(report.total.charges)],
+          [],
+        ]
+      : [];
+
   const rows: string[][] = [
     ["Elypse Home — Finances", periodLabel(filters)],
     ["Rattachement", modeLabel(filters.mode, filters.periode)],
     ["Annulations", cancelLabel(filters.annulations)],
-    ["Bénéfice", "Chiffre d'affaires − commissions − frais de paiement − remboursements − taxe de séjour − TVA"],
+    ["Net avant charges", "Chiffre d'affaires − commissions − frais de paiement − remboursements − taxe de séjour − TVA"],
+    ["Bénéfice", "Net avant charges − charges TTC (charges saisies, comptées au jour près)"],
+    ...(report.excluded.length ? [["Biens exclus des calculs", report.excluded.map((b) => b.name).join(", ")]] : []),
     [],
     ...(filters.vue === "reservations" ? perReservation(report.reservations) : main.flatMap(section)),
+    ...perCharge(report.charges),
     ...section({ ...channels, total: channels.total }),
   ];
 
