@@ -538,8 +538,8 @@ function AmountDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
-        <form onSubmit={submit} className="grid gap-5">
+      <DialogContent className="max-h-[92dvh] overflow-x-hidden overflow-y-auto sm:max-w-lg">
+        <form onSubmit={submit} className="grid min-w-0 grid-cols-1 gap-5">
           <DialogHeader>
             <DialogTitle className="font-serif text-2xl font-normal text-ink">
               {state.kind === "create" ? "Nouvelle charge" : `Modifier « ${state.charge.label} »`}
@@ -611,8 +611,8 @@ function AmountDialog({
           )}
 
           {!stop && (
-            <div className="grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9.5rem]">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9.5rem]">
                 <Field label="Montant par mois">
                   <div className="flex">
                     <Input
@@ -675,12 +675,12 @@ function AmountDialog({
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label={stop ? "Arrêter à partir du" : "À partir du"}>
-              <Input type="date" value={start} required onChange={(e) => setStart(e.target.value)} />
+              <Input type="date" className={DATE_INPUT} value={start} required onChange={(e) => setStart(e.target.value)} />
             </Field>
             <Field label="Jusqu'au (facultatif)">
-              <Input type="date" value={end} min={start} onChange={(e) => setEnd(e.target.value)} aria-invalid={!!end && end < start} />
+              <Input type="date" className={DATE_INPUT} value={end} min={start} onChange={(e) => setEnd(e.target.value)} aria-invalid={!!end && end < start} />
             </Field>
           </div>
 
@@ -759,9 +759,15 @@ function RenameDialog({ charge, pending, run, onClose }: { charge: ReportCharge;
   );
 }
 
+/**
+ * Champ date : sur iPhone (Safari), un champ date garde sa largeur native et fait déborder le dialog
+ * (défilement horizontal). On retire l'apparence native et on aligne la date à gauche.
+ */
+const DATE_INPUT = "block appearance-none text-left [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:min-h-[1.25em]";
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="grid gap-1.5">
+    <label className="grid min-w-0 gap-1.5">
       <span className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">{label}</span>
       {children}
     </label>
