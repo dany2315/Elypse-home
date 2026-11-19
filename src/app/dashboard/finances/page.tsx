@@ -164,7 +164,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           <CircleSlash className="size-4 shrink-0" aria-hidden />
           <span>
             Exclu{report.excluded.length > 1 ? "s" : ""} des calculs : {report.excluded.map((b) => b.name).join(", ")} (à
-            changer dans « Biens comptés », en haut)
+            changer dans le filtre « Biens », en haut)
           </span>
         </p>
       )}

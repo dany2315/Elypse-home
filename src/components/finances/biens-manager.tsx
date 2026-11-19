@@ -161,7 +161,7 @@ function BienCard({
           <span className="font-medium text-ink">{bien.excluded ? "Exclu des calculs financiers" : "Compté dans les finances"}</span>
           <span className="block text-xs text-muted-foreground">
             {bien.excluded
-              ? "Ses réservations et ses charges ne sont pas dans les totaux, les graphiques ni l'export. Vous pouvez toujours le consulter seul en le choisissant dans le filtre « Bien »."
+              ? "Ses réservations et ses charges ne sont pas dans les totaux, les graphiques ni l'export. Vous pouvez toujours le consulter seul avec « Voir seul » dans le filtre « Biens » du rapport."
               : "Désactivez pour retirer ce bien des totaux, des graphiques et de l'export (bien que vous ne gérez plus, logement personnel…)."}
           </span>
         </span>

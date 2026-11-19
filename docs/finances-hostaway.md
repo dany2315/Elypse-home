@@ -183,7 +183,7 @@ Demande d'Elypse : saisir à la main les autres charges de chaque bien (loyer, l
 
 ## Biens exclus des calculs (19/11/2026)
 
-`bien.excludedFromReports` (sélecteur « Biens comptés » dans les filtres de `/dashboard/finances`, ou interrupteur « Compté dans les finances » sur `/dashboard/finances/biens`) : les réservations, nuits disponibles et charges du bien sont ignorées dans le rapport de tous les biens (totaux, graphiques, plateformes, export). Le bien reste consultable seul en le choisissant dans le filtre « Bien » (bandeau d'avertissement), et sa carte de livret garde ses propres chiffres du mois. Tables et colonne créées par `prisma/sql/2026-11-finances-4.sql` (appliqué sur staging ; à appliquer en production).
+`bien.excludedFromReports` (interrupteur par bien dans le filtre « Biens » de `/dashboard/finances`, ou interrupteur « Compté dans les finances » sur `/dashboard/finances/biens`) : les réservations, nuits disponibles et charges du bien sont ignorées dans le rapport de tous les biens (totaux, graphiques, plateformes, export). Le bien reste consultable seul avec « Voir seul » dans le même filtre (bandeau d'avertissement), et sa carte de livret garde ses propres chiffres du mois. Tables et colonne créées par `prisma/sql/2026-11-finances-4.sql` (appliqué sur staging ; à appliquer en production).
 
 ## Coût du ménage (17/11/2026)
 

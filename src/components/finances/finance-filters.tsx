@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronDown, Loader2 } from "lucide-react";
+import { ArrowLeft, Building2, ChevronDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -120,27 +120,14 @@ export function FinanceFiltersBar({ filters, years, groups, biens }: Props) {
           </>
         )}
 
-        <Field label="Bien">
-          <Select value={filters.bien} onValueChange={(v) => update({ bien: v })}>
-            <SelectTrigger className="w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="tous">Tous les biens</SelectItem>
-              {groups.map((g) => (
-                <SelectItem key={g.key} value={g.key}>
-                  {g.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <Field label="Biens">
+          <BiensFilter
+            biens={biens}
+            others={groups.filter((g) => !biens.some((b) => b.id === g.key))}
+            selected={filters.bien}
+            onSelect={(bien) => update({ bien })}
+          />
         </Field>
-
-        {biens.length > 0 && (
-          <Field label="Biens comptés">
-            <CountedBiens biens={biens} />
-          </Field>
-        )}
 
         <Field label="Affichage">
           <div className="inline-flex h-8 rounded-lg border border-input p-0.5">
@@ -183,15 +170,28 @@ export function FinanceFiltersBar({ filters, years, groups, biens }: Props) {
 }
 
 /**
- * Choix des biens comptés dans le rapport : un interrupteur par bien. Un bien exclu sort des totaux,
- * graphiques et exports de tous les biens (enregistré : le choix reste jusqu'à ce qu'on le change).
+ * Filtre « Biens » : un interrupteur par bien pour le compter ou non dans le rapport (enregistré : le
+ * choix reste jusqu'à ce qu'on le change), et « Voir seul » pour afficher un seul bien (filtre d'URL).
  */
-function CountedBiens({ biens }: { biens: CountedBien[] }) {
+function BiensFilter({
+  biens,
+  others,
+  selected,
+  onSelect,
+}: {
+  biens: CountedBien[];
+  /** Listings non regroupés : toujours comptés, consultables seuls. */
+  others: { key: string; name: string }[];
+  selected: string;
+  onSelect: (bien: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   // État affiché tout de suite, avant la réponse du serveur.
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const excludedOf = (b: CountedBien) => optimistic[b.id] ?? b.excluded;
   const counted = biens.filter((b) => !excludedOf(b)).length;
+  const alone = selected === "tous" ? null : (biens.find((b) => b.id === selected)?.name ?? others.find((o) => o.key === selected)?.name ?? null);
 
   function toggle(targets: CountedBien[], excluded: boolean) {
     const changed = targets.filter((b) => excludedOf(b) !== excluded);
@@ -205,39 +205,65 @@ function CountedBiens({ biens }: { biens: CountedBien[] }) {
     });
   }
 
+  function select(bien: string) {
+    setOpen(false);
+    onSelect(bien);
+  }
+
+  const total = biens.length + others.length;
+  const label = alone ?? (counted === biens.length ? `Tous les biens (${total})` : `${counted + others.length} sur ${total}`);
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 w-52 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 text-sm text-ink transition hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          className={cn(
+            "inline-flex h-8 w-56 items-center gap-2 rounded-lg border bg-transparent px-2.5 text-sm text-ink transition hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
+            alone ? "border-gold" : "border-input",
+          )}
         >
-          <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="flex-1 truncate text-left">
-            {counted === biens.length ? `Tous (${biens.length})` : `${counted} sur ${biens.length}`}
-          </span>
+          <Building2 className={cn("size-4 shrink-0", alone ? "text-gold-deep" : "text-muted-foreground")} aria-hidden />
+          <span className="flex-1 truncate text-left">{label}</span>
           {pending ? <Loader2 className="size-4 animate-spin text-gold-deep" aria-label="Enregistrement" /> : <ChevronDown className="size-4 text-muted-foreground" aria-hidden />}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0">
+      <PopoverContent align="start" className="w-[min(24rem,calc(100vw-2rem))] p-0">
         <div className="border-b border-border/70 px-4 py-3">
-          <p className="text-sm font-medium text-ink">Biens comptés dans le rapport</p>
+          <p className="text-sm font-medium text-ink">Biens du rapport</p>
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-            Un bien décoché sort des totaux, des graphiques et de l&apos;export. Il reste consultable seul avec le filtre « Bien ».
+            L&apos;interrupteur compte ou retire un bien des totaux, des graphiques et de l&apos;export. « Voir seul » affiche un seul
+            bien.
           </p>
         </div>
-        <ul className="max-h-72 overflow-y-auto py-1">
+        {alone && (
+          <button
+            type="button"
+            onClick={() => select("tous")}
+            className="flex w-full items-center gap-2 border-b border-border/70 bg-accent/50 px-4 py-2 text-left text-sm font-medium text-gold-deep hover:bg-accent"
+          >
+            <ArrowLeft className="size-4" aria-hidden /> Revenir à tous les biens
+          </button>
+        )}
+        <ul className="max-h-80 overflow-y-auto py-1">
           {biens.map((b) => {
             const on = !excludedOf(b);
             return (
-              <li key={b.id}>
-                <label className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-accent/40">
-                  <span className={cn("min-w-0 flex-1 truncate text-sm", on ? "text-ink" : "text-muted-foreground line-through")}>{b.name}</span>
-                  <Switch checked={on} onCheckedChange={(v) => toggle([b], !v)} aria-label={`Compter ${b.name}`} />
-                </label>
+              <li key={b.id} className={cn("flex items-center gap-2 px-4 py-1.5", selected === b.id && "bg-accent/40")}>
+                <span className={cn("min-w-0 flex-1 truncate text-sm", on ? "text-ink" : "text-muted-foreground line-through")}>{b.name}</span>
+                <AloneButton active={selected === b.id} onClick={() => select(b.id)} />
+                <Switch checked={on} onCheckedChange={(v) => toggle([b], !v)} aria-label={`Compter ${b.name} dans le rapport`} />
               </li>
             );
           })}
+          {others.map((o) => (
+            <li key={o.key} className={cn("flex items-center gap-2 px-4 py-1.5", selected === o.key && "bg-accent/40")}>
+              <span className="min-w-0 flex-1 truncate text-sm text-ink">{o.name}</span>
+              <AloneButton active={selected === o.key} onClick={() => select(o.key)} />
+              {/* Même largeur que l'interrupteur : les boutons restent alignés. */}
+              <span className="w-8" aria-hidden />
+            </li>
+          ))}
         </ul>
         {counted < biens.length && (
           <div className="border-t border-border/70 px-4 py-2">
@@ -248,6 +274,22 @@ function CountedBiens({ biens }: { biens: CountedBien[] }) {
         )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+function AloneButton({ active, onClick }: { active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={active}
+      className={cn(
+        "shrink-0 rounded-md px-2 py-1 text-xs font-medium transition",
+        active ? "bg-ink text-ivory" : "text-gold-deep hover:bg-accent",
+      )}
+    >
+      {active ? "Affiché" : "Voir seul"}
+    </button>
   );
 }
 
