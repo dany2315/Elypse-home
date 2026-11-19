@@ -82,7 +82,12 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
 
       <div className="gold-hairline my-8 h-px opacity-50" />
 
-      <FinanceFiltersBar filters={filters} years={years} groups={groups.options} />
+      <FinanceFiltersBar
+        filters={filters}
+        years={years}
+        groups={groups.options}
+        biens={groups.biens.map((b) => ({ id: b.id, name: b.name, excluded: groups.excluded.includes(b.id) }))}
+      />
 
       {/* items-start : ouvrir un détail n'étire pas les autres cartes. */}
       <section className="mt-8 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -158,10 +163,8 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
           <CircleSlash className="size-4 shrink-0" aria-hidden />
           <span>
-            Exclu{report.excluded.length > 1 ? "s" : ""} des calculs : {report.excluded.map((b) => b.name).join(", ")} ·{" "}
-            <Link href="/dashboard/finances/biens" className="text-gold-deep hover:underline">
-              modifier
-            </Link>
+            Exclu{report.excluded.length > 1 ? "s" : ""} des calculs : {report.excluded.map((b) => b.name).join(", ")} (à
+            changer dans « Biens comptés », en haut)
           </span>
         </p>
       )}

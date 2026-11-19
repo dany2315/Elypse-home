@@ -1,11 +1,15 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Building2, ChevronDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { setBienExcluded } from "@/app/dashboard/finances/actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { MONTH_NAMES, toSearchParams, validDate, VUES, type FinanceFilters, type Periode } from "@/lib/finances/filters";
 import { CANCEL_FILTERS, MODES } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
@@ -20,9 +24,13 @@ type Props = {
   filters: FinanceFilters;
   years: number[];
   groups: { key: string; name: string }[];
+  /** Biens (regroupements) avec leur état : compté ou exclu des calculs. */
+  biens: CountedBien[];
 };
 
-export function FinanceFiltersBar({ filters, years, groups }: Props) {
+type CountedBien = { id: string; name: string; excluded: boolean };
+
+export function FinanceFiltersBar({ filters, years, groups, biens }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
@@ -128,6 +136,12 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
           </Select>
         </Field>
 
+        {biens.length > 0 && (
+          <Field label="Biens comptés">
+            <CountedBiens biens={biens} />
+          </Field>
+        )}
+
         <Field label="Affichage">
           <div className="inline-flex h-8 rounded-lg border border-input p-0.5">
             {VUES.map(({ value, label }) => (
@@ -165,6 +179,75 @@ export function FinanceFiltersBar({ filters, years, groups }: Props) {
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * Choix des biens comptés dans le rapport : un interrupteur par bien. Un bien exclu sort des totaux,
+ * graphiques et exports de tous les biens (enregistré : le choix reste jusqu'à ce qu'on le change).
+ */
+function CountedBiens({ biens }: { biens: CountedBien[] }) {
+  const [pending, startTransition] = useTransition();
+  // État affiché tout de suite, avant la réponse du serveur.
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  const excludedOf = (b: CountedBien) => optimistic[b.id] ?? b.excluded;
+  const counted = biens.filter((b) => !excludedOf(b)).length;
+
+  function toggle(targets: CountedBien[], excluded: boolean) {
+    const changed = targets.filter((b) => excludedOf(b) !== excluded);
+    if (!changed.length) return;
+    setOptimistic((o) => ({ ...o, ...Object.fromEntries(changed.map((b) => [b.id, excluded])) }));
+    startTransition(async () => {
+      const results = await Promise.all(changed.map((b) => setBienExcluded(b.id, excluded)));
+      const failed = results.find((r) => !r.ok);
+      if (failed && !failed.ok) toast.error(failed.error);
+      setOptimistic({});
+    });
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex h-8 w-52 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 text-sm text-ink transition hover:bg-accent/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          <Building2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="flex-1 truncate text-left">
+            {counted === biens.length ? `Tous (${biens.length})` : `${counted} sur ${biens.length}`}
+          </span>
+          {pending ? <Loader2 className="size-4 animate-spin text-gold-deep" aria-label="Enregistrement" /> : <ChevronDown className="size-4 text-muted-foreground" aria-hidden />}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-0">
+        <div className="border-b border-border/70 px-4 py-3">
+          <p className="text-sm font-medium text-ink">Biens comptés dans le rapport</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+            Un bien décoché sort des totaux, des graphiques et de l&apos;export. Il reste consultable seul avec le filtre « Bien ».
+          </p>
+        </div>
+        <ul className="max-h-72 overflow-y-auto py-1">
+          {biens.map((b) => {
+            const on = !excludedOf(b);
+            return (
+              <li key={b.id}>
+                <label className="flex cursor-pointer items-center gap-3 px-4 py-2 hover:bg-accent/40">
+                  <span className={cn("min-w-0 flex-1 truncate text-sm", on ? "text-ink" : "text-muted-foreground line-through")}>{b.name}</span>
+                  <Switch checked={on} onCheckedChange={(v) => toggle([b], !v)} aria-label={`Compter ${b.name}`} />
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        {counted < biens.length && (
+          <div className="border-t border-border/70 px-4 py-2">
+            <button type="button" onClick={() => toggle(biens, false)} className="text-xs font-medium text-gold-deep hover:underline">
+              Tout compter
+            </button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
