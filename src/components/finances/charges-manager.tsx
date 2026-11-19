@@ -108,8 +108,6 @@ const perMonth = (s: { amountCents: number; vatRateBp: number }) =>
 export function ChargesManager({ today, biens }: { today: string; biens: BienData[] }) {
   const [pending, startTransition] = useTransition();
   const [dialog, setDialog] = useState<DialogState>(null);
-  const month = today.slice(0, 7);
-
   const run: Run = (action, success, after) =>
     startTransition(async () => {
       const res = await action();
@@ -118,26 +116,6 @@ export function ChargesManager({ today, biens }: { today: string; biens: BienDat
         after?.();
       } else toast.error(res.error);
     });
-
-  const summary = useMemo(() => {
-    const t = { ht: 0, vat: 0, count: 0, biens: 0 };
-    for (const b of biens) {
-      if (b.excluded) continue;
-      let any = false;
-      for (const c of b.charges) {
-        const m = chargeForMonth(chargeSegments(c.versions), month);
-        t.ht += m.ht;
-        t.vat += m.vat;
-        if (m.ttc) {
-          t.count++;
-          any = true;
-        }
-      }
-      if (any) t.biens++;
-    }
-    return t;
-  }, [biens, month]);
-  const excludedCount = biens.filter((b) => b.excluded).length;
 
   if (biens.length === 0) {
     return (
@@ -156,26 +134,6 @@ export function ChargesManager({ today, biens }: { today: string; biens: BienDat
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-4 rounded-3xl border border-gold/40 bg-night px-6 py-5 text-ivory sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-[10px] font-semibold tracking-[0.2em] text-gold-light uppercase">Charges de {monthLabel(month)}</p>
-          <p className="mt-2 font-serif text-3xl tabular-nums">{eur(summary.ht + summary.vat)}</p>
-          <p className="mt-1 text-xs text-ivory/70">
-            TTC · dont {eur(summary.ht)} HT et {eur(summary.vat)} de TVA ·{" "}
-            {summary.count === 0
-              ? "aucune charge ce mois-ci"
-              : `${summary.count} charge${summary.count > 1 ? "s" : ""} sur ${summary.biens} bien${summary.biens > 1 ? "s" : ""}`}
-            {excludedCount > 0 && ` · biens exclus des calculs non comptés`}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {pending && <Loader2 className="size-4 animate-spin text-gold-light" aria-label="Enregistrement…" />}
-          <Button asChild variant="outline" size="lg" className="border-gold/50 bg-transparent text-ivory hover:bg-ivory/10 hover:text-ivory">
-            <Link href="/dashboard/finances">Voir le bénéfice</Link>
-          </Button>
-        </div>
-      </section>
-
       <ul className="flex flex-col gap-4">
         {biens.map((b) => (
           <li key={b.id}>
