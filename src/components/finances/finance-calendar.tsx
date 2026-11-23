@@ -248,7 +248,7 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
       {!single && (
         <div className="border-t border-border/70 px-4 py-4 sm:px-6">
           <p className="text-xs text-muted-foreground">
-            Dans chaque jour, une ligne par bien, dans cet ordre (survolez un bien pour le repérer, cliquez pour le voir seul) :
+            Dans chaque jour, une ligne par bien, dans cet ordre. Choisissez un bien pour le voir seul.
           </p>
           <ol className="mt-2.5 flex flex-wrap gap-1.5" onMouseLeave={() => setFocusUnit(null)}>
             {data.units.map((u) => {
@@ -337,12 +337,23 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Lane({ stays, day, weekday, height, label, dimmed }: { stays: CalendarStay[]; day: string; weekday: number; height: number; label: boolean; dimmed: boolean }) {
   const { previous, current } = laneAt(stays, day);
   const round = Math.min(height / 2, 6);
+  // z-[1] : la barre passe au-dessus du trait entre deux jours (bordure de la case suivante),
+  // sinon le séjour paraît coupé à chaque jour.
   const piece = (s: CalendarStay, style: React.CSSProperties) => (
-    <span className="absolute inset-y-0" style={{ background: channelColor(s.channel), ...style }} />
+    <span className="absolute inset-y-0 z-[1]" style={{ background: channelColor(s.channel), ...style }} />
   );
   // Nom du voyageur : au jour d'arrivée, ou en début de semaine pour un séjour commencé avant.
-  const showLabel = label && current && (current.arrival === day || weekday === 0);
-  const span = showLabel ? Math.min(nightsBetween(day, current.departure), 7 - weekday) : 0;
+  // Il occupe toute la barre jusqu'au départ (milieu du jour de départ) ou jusqu'à la fin de la semaine.
+  // Arrivée le dimanche : une demi-case ne suffit pas, le nom s'affiche le lundi suivant.
+  const showLabel = label && current && ((current.arrival === day && weekday < 6) || weekday === 0);
+  let labelLeft = "6px";
+  let labelWidth = "0px";
+  if (showLabel) {
+    const nights = nightsBetween(day, current.departure);
+    const end = weekday + nights <= 6 ? `(${nights * 100 + 50}% - 3px)` : `${(7 - weekday) * 100}%`;
+    labelLeft = current.arrival === day ? "calc(50% + 9px)" : "6px";
+    labelWidth = current.arrival === day ? `calc(${end} - 50% - 15px)` : `calc(${end} - 12px)`;
+  }
   return (
     // Fond léger de la ligne : une nuit libre reste visible comme un creux.
     <span className={cn("relative block bg-ink/[0.045] transition-opacity", dimmed && "opacity-20")} style={{ height }}>
@@ -357,10 +368,7 @@ function Lane({ stays, day, weekday, height, label, dimmed }: { stays: CalendarS
       {showLabel && (
         <span
           className="pointer-events-none absolute inset-y-0 z-10 truncate text-[11px] leading-[22px] font-medium text-white"
-          style={{
-            left: current.arrival === day ? "calc(50% + 9px)" : 6,
-            width: current.arrival === day ? `calc(${span * 100}% - 50% - 14px)` : `calc(${span * 100}% - 12px)`,
-          }}
+          style={{ left: labelLeft, width: labelWidth }}
         >
           {current.guestName ?? channelLabel(current.channel)}
         </span>
