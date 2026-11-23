@@ -2,9 +2,9 @@
 
 import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { dayActivity, laneAt, monthStats, monthWeeks, type CalendarData, type CalendarStay } from "@/lib/finances/calendar";
 import { channelColor } from "@/lib/finances/charts";
 import { eur, pct } from "@/lib/finances/filters";
@@ -25,19 +25,6 @@ const shortDay = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "shor
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const nightsBetween = (a: string, b: string) => Math.round((utc(b).getTime() - utc(a).getTime()) / 86_400_000);
 
-/** Appareil avec souris : détail au survol ; sinon (tactile) au toucher, en panneau du bas. */
-function useCanHover() {
-  return useSyncExternalStore(
-    (cb) => {
-      const m = window.matchMedia("(hover: hover) and (pointer: fine)");
-      m.addEventListener("change", cb);
-      return () => m.removeEventListener("change", cb);
-    },
-    () => window.matchMedia("(hover: hover) and (pointer: fine)").matches,
-    () => true,
-  );
-}
-
 type Props = {
   data: CalendarData;
   today: string;
@@ -49,9 +36,14 @@ type Props = {
 };
 
 export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, unitHrefs }: Props) {
-  const canHover = useCanHover();
+  // Détail du jour : petite carte au survol / clic à la souris, panneau du bas au toucher.
+  // Le mode suit l'appareil qui a réellement servi (souris ou doigt), pas le type d'écran annoncé.
+  const [mode, setMode] = useState<"popover" | "sheet">("popover");
   const [active, setActive] = useState<string | null>(null);
+  // Jour affiché dans le détail : gardé pendant l'animation de fermeture.
+  const [shown, setShown] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
+  const pointer = useRef("mouse");
   const [focusUnit, setFocusUnit] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,13 +64,18 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
   };
+  const open = (day: string, m: "popover" | "sheet") => {
+    setMode(m);
+    setShown(day);
+    setActive(day);
+  };
   const hoverOpen = (day: string) => {
-    if (!canHover || pinned) return;
+    if (pinned) return;
     clear();
-    timer.current = setTimeout(() => setActive(day), active ? 60 : 160);
+    timer.current = setTimeout(() => open(day, "popover"), active ? 60 : 160);
   };
   const hoverClose = () => {
-    if (!canHover || pinned) return;
+    if (pinned || mode === "sheet") return;
     clear();
     timer.current = setTimeout(() => setActive(null), 180);
   };
@@ -89,15 +86,15 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
   };
   const click = (day: string) => {
     clear();
-    if (active === day && pinned) return close();
-    setActive(day);
+    const m = pointer.current === "mouse" ? "popover" : "sheet";
+    if (active === day && pinned && mode === m) return close();
+    open(day, m);
     setPinned(true);
   };
 
-  const activity = active ? dayActivity(data.stays, active) : null;
-  const detail = active && activity && (
-    <DayDetail day={active} activity={activity} units={data.units.length} single={single} today={today} />
-  );
+  const activity = shown ? dayActivity(data.stays, shown) : null;
+  const detail = (sheet: boolean) =>
+    shown && activity && <DayDetail day={shown} activity={activity} units={data.units.length} single={single} today={today} sheet={sheet} />;
 
   return (
     <section className="rounded-3xl border border-border/80 bg-card shadow-[0_1px_0_rgba(18,22,42,.04),0_20px_40px_-28px_rgba(18,22,42,.35)]">
@@ -160,27 +157,28 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
               {week.map((day, i) => {
                 const a = day.inMonth ? dayActivity(data.stays, day.date) : null;
                 const isToday = day.date === today;
-                const open = active === day.date;
+                const isOpen = active === day.date;
                 const cell = (
                   <button
                     type="button"
                     disabled={!day.inMonth}
-                    onMouseEnter={() => day.inMonth && hoverOpen(day.date)}
-                    onMouseLeave={hoverClose}
+                    onPointerDown={(e) => (pointer.current = e.pointerType)}
+                    onPointerEnter={(e) => e.pointerType === "mouse" && day.inMonth && hoverOpen(day.date)}
+                    onPointerLeave={(e) => e.pointerType === "mouse" && hoverClose()}
                     onClick={() => click(day.date)}
                     aria-label={
                       a
                         ? `${dayTitle.format(utc(day.date))} : ${a.occupied} logement${a.occupied > 1 ? "s" : ""} occupé${a.occupied > 1 ? "s" : ""}, ${a.arrivals.length} arrivée${a.arrivals.length > 1 ? "s" : ""}, ${a.departures.length} départ${a.departures.length > 1 ? "s" : ""}`
                         : undefined
                     }
-                    aria-expanded={day.inMonth ? open : undefined}
+                    aria-expanded={day.inMonth ? isOpen : undefined}
                     className={cn(
                       "group/day relative flex w-full flex-col text-left outline-none",
                       i > 0 && "border-l border-border/70",
                       day.inMonth ? "cursor-pointer" : "cursor-default bg-muted/30",
                       day.inMonth && day.weekend && "bg-sand/35",
                       day.inMonth && "transition-colors hover:bg-accent/45 focus-visible:bg-accent/45",
-                      open && "bg-accent/60 hover:bg-accent/60",
+                      isOpen && "bg-accent/60 hover:bg-accent/60",
                     )}
                     style={{ minHeight: Math.max(single ? 76 : 70, 40 + lanesBlock) }}
                   >
@@ -221,9 +219,9 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
                     )}
                   </button>
                 );
-                if (!day.inMonth || !canHover) return <div key={day.date} className="contents">{cell}</div>;
+                if (!day.inMonth) return <div key={day.date} className="contents">{cell}</div>;
                 return (
-                  <Popover key={day.date} open={open} onOpenChange={(o) => !o && close()}>
+                  <Popover key={day.date} open={isOpen && mode === "popover"} onOpenChange={(o) => !o && close()}>
                     <PopoverAnchor asChild>{cell}</PopoverAnchor>
                     <PopoverContent
                       side="right"
@@ -236,7 +234,7 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
                       onMouseLeave={hoverClose}
                       className="w-[23rem] max-w-[calc(100vw-2rem)] gap-0 rounded-2xl p-0 shadow-[0_24px_60px_-24px_rgba(18,22,42,.45)]"
                     >
-                      {detail}
+                      {detail(false)}
                     </PopoverContent>
                   </Popover>
                 );
@@ -284,19 +282,27 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
         </div>
       )}
 
-      {/* Tactile : détail du jour dans un panneau du bas */}
-      {!canHover && (
-        <Sheet open={active !== null} onOpenChange={(o) => !o && close()}>
-          <SheetContent side="bottom" className="max-h-[85dvh] gap-0 overflow-y-auto rounded-t-3xl p-0">
-            <SheetHeader className="sr-only">
-              <SheetTitle>{active ? capitalize(dayTitle.format(utc(active))) : "Détail du jour"}</SheetTitle>
-              <SheetDescription>Réservations du jour</SheetDescription>
-            </SheetHeader>
-            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-muted" aria-hidden />
-            {detail}
-          </SheetContent>
-        </Sheet>
-      )}
+      {/* Tactile : détail du jour dans un panneau du bas. En-tête et bouton « Fermer » fixes,
+          seule la liste défile : la fermeture reste toujours à portée de doigt. */}
+      <Sheet open={active !== null && mode === "sheet"} onOpenChange={(o) => !o && close()}>
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          className="max-h-[88dvh] gap-0 overflow-hidden rounded-t-3xl p-0 pb-[env(safe-area-inset-bottom)]"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{shown ? capitalize(dayTitle.format(utc(shown))) : "Détail du jour"}</SheetTitle>
+            <SheetDescription>Réservations du jour</SheetDescription>
+          </SheetHeader>
+          <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-muted" aria-hidden />
+          {detail(true)}
+          <div className="shrink-0 border-t border-border/70 p-3">
+            <SheetClose className="h-11 w-full rounded-xl bg-night text-sm font-medium text-ivory transition active:scale-[0.99]">
+              Fermer
+            </SheetClose>
+          </div>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }
@@ -366,12 +372,27 @@ function Lane({ stays, day, weekday, height, label, dimmed }: { stays: CalendarS
 type Activity = ReturnType<typeof dayActivity>;
 
 /** Détail d'un jour : arrivées, séjours en cours et départs, avec les montants du séjour entier. */
-function DayDetail({ day, activity, units, single, today }: { day: string; activity: Activity; units: number; single: boolean; today: string }) {
+function DayDetail({
+  day,
+  activity,
+  units,
+  single,
+  today,
+  sheet,
+}: {
+  day: string;
+  activity: Activity;
+  units: number;
+  single: boolean;
+  today: string;
+  /** Panneau du bas (mobile) : la liste prend la hauteur restante et défile seule. */
+  sheet: boolean;
+}) {
   const { arrivals, staying, departures, occupied } = activity;
   const empty = !arrivals.length && !staying.length && !departures.length;
   return (
-    <div className="flex flex-col">
-      <div className="border-b border-border/70 px-4 pt-4 pb-3.5">
+    <div className={cn("flex flex-col", sheet && "min-h-0 flex-1")}>
+      <div className="shrink-0 border-b border-border/70 px-4 pt-4 pb-3.5">
         <p className="text-[10px] font-semibold tracking-[0.2em] text-gold-deep uppercase">{day === today ? "Aujourd'hui" : day < today ? "Passé" : "À venir"}</p>
         <p className="mt-1 font-serif text-2xl leading-tight text-ink">{capitalize(dayTitle.format(utc(day)))}</p>
         {!single && (
@@ -388,14 +409,14 @@ function DayDetail({ day, activity, units, single, today }: { day: string; activ
           </div>
         )}
       </div>
-      <div className="max-h-[60vh] overflow-y-auto px-2 py-2">
+      <div className={cn("overflow-y-auto overscroll-contain px-2 py-2", sheet ? "min-h-0 flex-1" : "max-h-[60vh]")}>
         {empty && <p className="px-2 py-6 text-center text-sm text-muted-foreground">Aucun séjour ce jour-là.</p>}
         <Group title="Arrivées" icon={<ArrowDownRight className="size-3.5" />} stays={arrivals} day={day} />
         <Group title="En séjour" icon={<BedDouble className="size-3.5" />} stays={staying} day={day} />
         <Group title="Départs" icon={<ArrowUpRight className="size-3.5" />} stays={departures} day={day} />
       </div>
       {!empty && (
-        <p className="border-t border-border/70 px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="shrink-0 border-t border-border/70 px-4 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
           Montants du séjour entier · net = après plateformes et taxes, avant vos charges.
         </p>
       )}
