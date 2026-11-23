@@ -49,6 +49,8 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
   const [pinned, setPinned] = useState(false);
   const pointer = useRef("mouse");
   const [focusUnit, setFocusUnit] = useState<string | null>(null);
+  // Repérage d'un bien au survol (souris, tous les biens) : ignoré quand un bien est affiché seul.
+  const focus = selected ? null : focusUnit;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weeks = useMemo(() => monthWeeks(data.month), [data.month]);
@@ -213,7 +215,7 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
                             weekday={i}
                             height={laneHeight}
                             label={single}
-                            dimmed={focusUnit !== null && focusUnit !== lane.key}
+                            dimmed={focus !== null && focus !== lane.key}
                           />
                         ))}
                       </span>
@@ -263,7 +265,7 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
               const lane = selected ? -1 : lanes.findIndex((l) => l.key === u.key);
               const empty = !selected && lane < 0;
               return (
-                <li key={u.key} onMouseEnter={() => lane >= 0 && setFocusUnit(u.key)}>
+                <li key={u.key} onPointerEnter={(e) => e.pointerType === "mouse" && lane >= 0 && setFocusUnit(u.key)}>
                   <Link
                     href={isSelected ? allHref : unitHrefs[u.key]}
                     scroll={false}
@@ -276,7 +278,7 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
                         : empty
                           ? "border-dashed border-border text-muted-foreground hover:border-gold"
                           : "border-border text-ink hover:border-gold hover:bg-accent/50",
-                      focusUnit === u.key && "border-gold bg-accent/60",
+                      focus === u.key && "border-gold bg-accent/60",
                     )}
                   >
                     {!selected && (
