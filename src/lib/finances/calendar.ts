@@ -25,8 +25,10 @@ export type CalendarData = {
   /** Mois affiché, AAAA-MM. */
   month: string;
   stays: CalendarStay[];
-  /** Biens comptés (ordre d'affichage) : une ligne par bien dans chaque jour. */
+  /** Biens affichés (ordre d'affichage) : une ligne par bien dans chaque jour. */
   units: { key: string; name: string }[];
+  /** Tous les biens comptés (et le bien affiché seul) : légende sous le calendrier. */
+  legend: { key: string; name: string }[];
 };
 
 export type CalendarDay = {

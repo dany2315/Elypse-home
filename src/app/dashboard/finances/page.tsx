@@ -104,9 +104,9 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
             prevHref={monthHref(prevMonth(calendarData.month))}
             nextHref={monthHref(nextMonth(calendarData.month))}
             todayHref={monthHref(today.slice(0, 7))}
-            unitHrefs={
-              filters.bien === "tous" ? Object.fromEntries(calendarData.units.map((u) => [u.key, hrefWith({ bien: u.key })])) : undefined
-            }
+            unitHrefs={Object.fromEntries(calendarData.legend.map((u) => [u.key, hrefWith({ bien: u.key })]))}
+            allHref={hrefWith({ bien: "tous" })}
+            selected={filters.bien === "tous" ? null : filters.bien}
           />
         </div>
       )}

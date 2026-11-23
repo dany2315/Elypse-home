@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BedDouble, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
@@ -31,11 +31,15 @@ type Props = {
   prevHref: string;
   nextHref: string;
   todayHref: string;
-  /** Lien « voir ce bien seul » pour chaque bien (absent quand un seul bien est affiché). */
-  unitHrefs?: Record<string, string>;
+  /** Lien « voir ce bien seul » pour chaque bien de la légende. */
+  unitHrefs: Record<string, string>;
+  /** Lien vers tous les biens (pour désélectionner le bien affiché seul). */
+  allHref: string;
+  /** Bien affiché seul, ou null pour tous les biens. */
+  selected: string | null;
 };
 
-export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, unitHrefs }: Props) {
+export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, unitHrefs, allHref, selected }: Props) {
   // Détail du jour : petite carte au survol / clic à la souris, panneau du bas au toucher.
   // Le mode suit l'appareil qui a réellement servi (souris ou doigt), pas le type d'écran annoncé.
   const [mode, setMode] = useState<"popover" | "sheet">("popover");
@@ -244,37 +248,50 @@ export function FinanceCalendar({ data, today, prevHref, nextHref, todayHref, un
         </div>
       </div>
 
-      {/* Biens : une ligne chacun, dans cet ordre */}
-      {!single && (
+      {/* Biens : toujours visibles. Tous les biens : une ligne chacun, dans cet ordre (numéros).
+          Un bien seul : son badge ressort, le toucher à nouveau revient à tous les biens. */}
+      {data.legend.length > 1 && (
         <div className="border-t border-border/70 px-4 py-4 sm:px-6">
           <p className="text-xs text-muted-foreground">
-            Dans chaque jour, une ligne par bien, dans cet ordre. Choisissez un bien pour le voir seul.
+            {selected
+              ? "Un seul bien affiché. Touchez-le à nouveau pour revoir tous les biens, ou choisissez-en un autre."
+              : "Dans chaque jour, une ligne par bien, dans cet ordre. Choisissez un bien pour le voir seul."}
           </p>
           <ol className="mt-2.5 flex flex-wrap gap-1.5" onMouseLeave={() => setFocusUnit(null)}>
-            {data.units.map((u) => {
-              const lane = lanes.findIndex((l) => l.key === u.key);
-              const chip = (
-                <>
-                  <span className={cn("grid size-4 place-items-center rounded-full text-[9px] font-semibold tabular-nums", lane >= 0 ? "bg-night text-ivory" : "bg-muted text-muted-foreground")}>
-                    {lane >= 0 ? lane + 1 : "–"}
-                  </span>
-                  {u.name}
-                </>
-              );
-              const cls = cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition",
-                lane >= 0 ? "border-border text-ink hover:border-gold hover:bg-accent/50" : "border-dashed border-border text-muted-foreground",
-                focusUnit === u.key && "border-gold bg-accent/60",
-              );
+            {data.legend.map((u) => {
+              const isSelected = selected === u.key;
+              const lane = selected ? -1 : lanes.findIndex((l) => l.key === u.key);
+              const empty = !selected && lane < 0;
               return (
                 <li key={u.key} onMouseEnter={() => lane >= 0 && setFocusUnit(u.key)}>
-                  {unitHrefs?.[u.key] ? (
-                    <Link href={unitHrefs[u.key]} scroll={false} className={cls} title={lane >= 0 ? "Voir ce bien seul" : "Aucun séjour ce mois-ci"}>
-                      {chip}
-                    </Link>
-                  ) : (
-                    <span className={cls}>{chip}</span>
-                  )}
+                  <Link
+                    href={isSelected ? allHref : unitHrefs[u.key]}
+                    scroll={false}
+                    aria-current={isSelected ? "true" : undefined}
+                    title={isSelected ? "Revoir tous les biens" : empty ? "Aucun séjour ce mois-ci" : "Voir ce bien seul"}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition",
+                      isSelected
+                        ? "border-night bg-night text-ivory hover:bg-night-3"
+                        : empty
+                          ? "border-dashed border-border text-muted-foreground hover:border-gold"
+                          : "border-border text-ink hover:border-gold hover:bg-accent/50",
+                      focusUnit === u.key && "border-gold bg-accent/60",
+                    )}
+                  >
+                    {!selected && (
+                      <span
+                        className={cn(
+                          "grid size-4 place-items-center rounded-full text-[9px] font-semibold tabular-nums",
+                          lane >= 0 ? "bg-night text-ivory" : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {lane >= 0 ? lane + 1 : "–"}
+                      </span>
+                    )}
+                    {u.name}
+                    {isSelected && <X className="size-3.5 text-gold-light" aria-label="désélectionner" />}
+                  </Link>
                 </li>
               );
             })}

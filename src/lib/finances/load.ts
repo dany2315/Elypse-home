@@ -206,9 +206,10 @@ export async function loadCalendar(f: FinanceFilters): Promise<CalendarData> {
     }))
     .sort((a, b) => a.arrival.localeCompare(b.arrival));
   const names = new Map(groups.options.map((o) => [o.key, o.name.replace(/ \((exclu des calculs|non regroupé)\)$/, "")]));
-  const units =
-    f.bien !== "tous"
-      ? [{ key: f.bien, name: names.get(f.bien) ?? f.bien }]
-      : groups.options.filter((o) => !groups.excluded.includes(o.key)).map((o) => ({ key: o.key, name: names.get(o.key)! }));
-  return { month, stays, units };
+  // Légende : biens comptés, plus le bien affiché seul s'il est exclu des calculs.
+  const legend = groups.options
+    .filter((o) => !groups.excluded.includes(o.key) || o.key === f.bien)
+    .map((o) => ({ key: o.key, name: names.get(o.key)! }));
+  const units = f.bien !== "tous" ? [{ key: f.bien, name: names.get(f.bien) ?? f.bien }] : legend;
+  return { month, stays, units, legend };
 }

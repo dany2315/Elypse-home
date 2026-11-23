@@ -47,6 +47,7 @@ test("occupation du mois : nuits coupées aux bornes du mois", () => {
   const s = monthStats({
     month: "2026-11",
     units: [{ key: "a", name: "A" }, { key: "b", name: "B" }],
+    legend: [{ key: "a", name: "A" }, { key: "b", name: "B" }],
     stays: [stay(1, "a", "2026-10-29", "2026-11-03"), stay(2, "b", "2026-11-28", "2026-12-04")],
   });
   assert.equal(s.nights, 2 + 3);
