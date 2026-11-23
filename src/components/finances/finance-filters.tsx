@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { MONTH_NAMES, toSearchParams, validDate, VUES, type FinanceFilters, type Periode } from "@/lib/finances/filters";
+import { defaultVue, MONTH_NAMES, toSearchParams, validDate, VUES, type FinanceFilters, type Periode } from "@/lib/finances/filters";
 import { CANCEL_FILTERS, MODES } from "@/lib/finances/report";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +37,11 @@ export function FinanceFiltersBar({ filters, years, groups, biens }: Props) {
 
   function update(patch: Partial<FinanceFilters>) {
     const next = { ...filters, ...patch };
+    // Le calendrier montre un mois : le choisir passe en période « Mois », et quitter « Mois »
+    // reprend la vue par défaut de la nouvelle période.
+    if (patch.vue === "calendrier") next.periode = "mois";
+    else if (patch.periode && patch.periode !== filters.periode) next.vue =
+        patch.periode === "mois" ? (next.vue === "reservations" ? "reservations" : defaultVue("mois")) : next.vue === "calendrier" ? "biens" : next.vue;
     startTransition(() => router.push(`${pathname}?${toSearchParams(next)}`, { scroll: false }));
   }
 

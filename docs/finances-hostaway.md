@@ -31,6 +31,10 @@ Chaque option affiche sous le filtre une phrase qui explique son effet (`MODES` 
 - **Date de réservation** : tout le séjour compte au mois où il a été réservé (suivi des ventes).
 - Annulations **Si elles rapportent** (par défaut) : comptées seulement si la plateforme verse quelque chose ; **Toutes** ; **Aucune**.
 
+## Affichage calendrier (23/11/2026)
+
+Vue par défaut quand la période est un mois (`vue=calendrier`, réservée au mode « Mois »). Données : `loadCalendar` (`src/lib/finances/load.ts`) reprend le rapport sur les 6 mois précédant la fin du mois, rattaché à l'arrivée et sans annulations, puis garde les séjours présents dans le mois : montants du séjour entier. Calculs purs (semaines, activité d'un jour, occupation du mois) dans `src/lib/finances/calendar.ts`. Une ligne par bien ayant un séjour dans le mois (ordre des biens) ; demi-case gauche = nuit précédente, demi-case droite = nuit du jour. Occupation = nuits occupées / (jours du mois × biens comptés). Mêmes règles de biens que le rapport (biens exclus ignorés sauf affichés seuls).
+
 ## Affichage par réservation
 
 `report.reservations` (`ReservationLine`) : chaque réservation comptée, avec la part de ses montants qui tombe dans la période. En mode « nuits passées », un séjour à cheval affiche « 2 nuits sur 3 dans la période » et 2/3 des montants (le reste compte dans la période voisine). Le **nom du voyageur** (`reservation.guestName`, champ `guestName` de Hostaway, ou prénom + nom) est stocké en base et affiché uniquement dans le tableau de bord (accès admin) et l'export CSV ; il n'apparaît jamais dans les journaux ni dans `raw`. Airbnb efface le nom quelque temps après le séjour : les réservations Airbnb d'avant mi-septembre 2026 affichent « Nom effacé ». Colonne ajoutée par `prisma/sql/2026-11-finances-3.sql` (appliqué sur staging ; à appliquer en production). La référence est passée par `publicReference` : pour Airbnb, seul le code de confirmation est gardé (la référence Hostaway contient l'identifiant du voyageur).

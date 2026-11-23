@@ -2,6 +2,7 @@ import { Building2, ChevronDown, CircleSlash, Download, Receipt, TriangleAlert }
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankedBars, ShareBar, TrendChart } from "@/components/finances/finance-charts";
+import { FinanceCalendar } from "@/components/finances/finance-calendar";
 import { FinanceFiltersBar } from "@/components/finances/finance-filters";
 import { FinanceTable } from "@/components/finances/finance-table";
 import { ReservationTable } from "@/components/finances/reservation-table";
@@ -11,7 +12,8 @@ import { requireSession } from "@/lib/auth";
 import { cancelLabel, eur, int, modeLabel, parseFilters, pct, periodLabel, todayInParis, toSearchParams } from "@/lib/finances/filters";
 import { chargeCategoryLabel } from "@/lib/finances/charges";
 import { occupancy, type Report } from "@/lib/finances/report";
-import { loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
+import { loadCalendar, loadGroups, loadReport, loadSyncState, loadYears } from "@/lib/finances/load";
+import { nextMonth, prevMonth } from "@/lib/finances/calendar";
 import { bienBars, channelColors, channelShares, trendFilters, trendPoints } from "@/lib/finances/charts";
 import { buildSections } from "@/lib/finances/views";
 
@@ -28,18 +30,23 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
   const filters = parseFilters(await props.searchParams, today);
 
   const trend = trendFilters(filters);
-  const [report, trendReport, groups, sync, years] = await Promise.all([
+  const calendar = filters.vue === "calendrier";
+  const [report, trendReport, groups, sync, years, calendarData] = await Promise.all([
     loadReport(filters),
     trend ? loadReport(trend.filters) : null,
     loadGroups(),
     loadSyncState(),
     loadYears(Number(today.slice(0, 4))),
+    calendar ? loadCalendar(filters) : null,
   ]);
   const { main, channels } = buildSections(report, filters);
   const points = trendPoints(trendReport ?? report, trend?.highlight);
   // Lien « Voir le livret » (aperçu dans le tableau de bord) pour chaque bien relié à un livret.
   const livretLinks = Object.fromEntries(Object.entries(groups.livretOf).map(([bien, livret]) => [bien, `/dashboard/livrets/${livret}/apercu`]));
   const exportHref = `/dashboard/finances/export?${toSearchParams(filters)}`;
+  // Liens du calendrier : mois voisins, mois en cours, et chaque bien seul.
+  const hrefWith = (patch: Partial<typeof filters>) => `/dashboard/finances?${toSearchParams({ ...filters, ...patch })}`;
+  const monthHref = (m: string) => hrefWith({ year: Number(m.slice(0, 4)), month: Number(m.slice(5, 7)) });
 
   return (
     <main className="mx-auto max-w-7xl px-4 pt-8 pb-24 sm:px-6 sm:pt-12">
@@ -88,6 +95,21 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         groups={groups.options}
         biens={groups.biens.map((b) => ({ id: b.id, name: b.name, excluded: groups.excluded.includes(b.id) }))}
       />
+
+      {calendarData && (
+        <div className="mt-6">
+          <FinanceCalendar
+            data={calendarData}
+            today={today}
+            prevHref={monthHref(prevMonth(calendarData.month))}
+            nextHref={monthHref(nextMonth(calendarData.month))}
+            todayHref={monthHref(today.slice(0, 7))}
+            unitHrefs={
+              filters.bien === "tous" ? Object.fromEntries(calendarData.units.map((u) => [u.key, hrefWith({ bien: u.key })])) : undefined
+            }
+          />
+        </div>
+      )}
 
       {/* items-start : ouvrir un détail n'étire pas les autres cartes. */}
       <section className="mt-8 grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

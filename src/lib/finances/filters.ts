@@ -18,11 +18,15 @@ export type FinanceFilters = {
   vue: Vue;
 };
 
-export type Vue = "biens" | "reservations";
+export type Vue = "biens" | "calendrier" | "reservations";
 export const VUES: { value: Vue; label: string }[] = [
   { value: "biens", label: "Par bien" },
+  { value: "calendrier", label: "Calendrier" },
   { value: "reservations", label: "Par réservation" },
 ];
+
+/** Vue par défaut : le calendrier pour un mois, le récapitulatif par bien sinon. */
+export const defaultVue = (periode: Periode): Vue => (periode === "mois" ? "calendrier" : "biens");
 
 type SearchParams = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -58,8 +62,10 @@ export function parseFilters(sp: SearchParams, today = todayInParis()): FinanceF
   if (to < from) [from, to] = [to, from];
   if (dayDiff(from, to) > MAX_RANGE_DAYS) to = new Date(Date.parse(`${from}T00:00:00Z`) + MAX_RANGE_DAYS * 86_400_000).toISOString().slice(0, 10);
 
+  const p: Periode = periode === "annee" || periode === "dates" ? periode : "mois";
+  const vue = one(sp.vue);
   return {
-    periode: periode === "annee" || periode === "dates" ? periode : "mois",
+    periode: p,
     year: Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : ty,
     month: Number.isInteger(month) && month >= 1 && month <= 12 ? month : tm,
     from,
@@ -67,7 +73,8 @@ export function parseFilters(sp: SearchParams, today = todayInParis()): FinanceF
     bien: one(sp.bien) || "tous",
     mode: MODES.some((m) => m.value === mode) ? (mode as Mode) : "sejour",
     annulations: CANCEL_FILTERS.some((c) => c.value === annulations) ? (annulations as CancelFilter) : "versement",
-    vue: one(sp.vue) === "reservations" ? "reservations" : "biens",
+    // Le calendrier montre un mois : hors période « Mois », on revient au récapitulatif par bien.
+    vue: vue === "reservations" || vue === "biens" ? vue : vue === "calendrier" && p === "mois" ? "calendrier" : defaultVue(p),
   };
 }
 
@@ -83,7 +90,7 @@ export function toSearchParams(f: FinanceFilters): URLSearchParams {
   if (f.bien !== "tous") p.set("bien", f.bien);
   if (f.mode !== "sejour") p.set("mode", f.mode);
   if (f.annulations !== "versement") p.set("annulations", f.annulations);
-  if (f.vue !== "biens") p.set("vue", f.vue);
+  if (f.vue !== defaultVue(f.periode)) p.set("vue", f.vue);
   return p;
 }
 

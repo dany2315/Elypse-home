@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db";
 import { toPeriod, type FinanceFilters } from "./filters";
 import type { ReportCharge } from "./charges";
+import { nextMonth, type CalendarData, type CalendarStay } from "./calendar";
 import { buildReport, periodRange, type Report, type ReportBien } from "./report";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -170,4 +171,44 @@ export async function loadLivretMonth(today: string): Promise<{
     t.available += row.totals.availableNights;
   }
   return { month: `${year}-${String(month).padStart(2, "0")}`, byLivret };
+}
+
+/**
+ * Séjours confirmés présents dans le mois du filtre (arrivés avant si besoin), pour la vue
+ * Calendrier. Montants du séjour entier (rattachés à l'arrivée), annulations exclues. Mêmes règles
+ * de biens que le rapport : biens exclus ignorés, sauf s'ils sont affichés seuls.
+ */
+export async function loadCalendar(f: FinanceFilters): Promise<CalendarData> {
+  const month = `${f.year}-${String(f.month).padStart(2, "0")}`;
+  const start = `${month}-01`;
+  const end = `${nextMonth(month)}-01`;
+  // Séjours arrivés jusqu'à 6 mois avant : couvre les longs séjours qui débordent sur le mois.
+  const from = iso(new Date(Date.parse(`${start}T00:00:00Z`) - 183 * 86_400_000));
+  const to = iso(new Date(Date.parse(`${end}T00:00:00Z`) - 86_400_000));
+  const [report, groups] = await Promise.all([
+    loadReport({ ...f, periode: "dates", from, to, mode: "arrivee", annulations: "aucune" }),
+    loadGroups(),
+  ]);
+  const stays: CalendarStay[] = report.reservations
+    .filter((l) => l.status !== "cancelled" && l.arrival < end && l.departure >= start)
+    .map((l) => ({
+      id: l.id,
+      unit: l.groupKey,
+      unitName: l.groupName,
+      channel: l.channel,
+      guestName: l.guestName,
+      reference: l.reference,
+      arrival: l.arrival,
+      departure: l.departure,
+      nights: l.stayNights,
+      gross: l.totals.gross,
+      payout: l.totals.payout,
+    }))
+    .sort((a, b) => a.arrival.localeCompare(b.arrival));
+  const names = new Map(groups.options.map((o) => [o.key, o.name.replace(/ \((exclu des calculs|non regroupé)\)$/, "")]));
+  const units =
+    f.bien !== "tous"
+      ? [{ key: f.bien, name: names.get(f.bien) ?? f.bien }]
+      : groups.options.filter((o) => !groups.excluded.includes(o.key)).map((o) => ({ key: o.key, name: names.get(o.key)! }));
+  return { month, stays, units };
 }
