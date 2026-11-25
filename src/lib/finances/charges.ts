@@ -8,6 +8,9 @@
  *
  * Dans un rapport, le montant mensuel est réparti au jour : un mois entier compte le montant
  * exact, le 1er au 15 novembre en compte 15/30.
+ *
+ * Une charge « par séjour » (ménage…) compte son montant une fois par séjour confirmé du bien,
+ * au tarif en vigueur le jour d'arrivée, rattachée comme le ménage payé par le voyageur.
  */
 
 export type ChargeCategory = "loyer" | "leasing" | "electricite" | "internet" | "assurance" | "copropriete" | "menage" | "autre";
@@ -22,6 +25,14 @@ export const CHARGE_CATEGORIES: { value: ChargeCategory; label: string }[] = [
   { value: "menage", label: "Ménage" },
   { value: "autre", label: "Autre" },
 ];
+
+/** Rythme d'une charge : montant mensuel, ou montant par séjour (ménage). */
+export type ChargePer = "mois" | "sejour";
+export const isChargePer = (p: string): p is ChargePer => p === "mois" || p === "sejour";
+/** Rythme proposé à la création selon le type (modifiable). */
+export const defaultPer = (c: string): ChargePer => (c === "menage" ? "sejour" : "mois");
+/** « / mois » ou « / séjour ». */
+export const perLabel = (p: ChargePer | undefined) => (p === "sejour" ? "séjour" : "mois");
 
 export const chargeCategoryLabel = (c: string) => CHARGE_CATEGORIES.find((x) => x.value === c)?.label ?? "Autre";
 export const isChargeCategory = (c: string): c is ChargeCategory => CHARGE_CATEGORIES.some((x) => x.value === c);
@@ -48,7 +59,7 @@ export type ChargeVersion = {
   start: string;
   /** Dernier jour inclus (AAAA-MM-JJ), null = sans fin. */
   end: string | null;
-  /** Montant mensuel hors taxes, en centimes (0 = charge arrêtée). */
+  /** Montant hors taxes, en centimes, par mois (ou par séjour) ; 0 = charge arrêtée. */
   amountCents: number;
   vatRateBp: number;
   /** Date de saisie (ISO) : départage les versions qui se chevauchent. */
@@ -57,7 +68,15 @@ export type ChargeVersion = {
   note?: string;
 };
 
-export type ReportCharge = { id: string; bienId: string; category: string; label: string; versions: ChargeVersion[] };
+export type ReportCharge = {
+  id: string;
+  bienId: string;
+  category: string;
+  label: string;
+  /** Rythme (mensuel par défaut). Par séjour : `amountCents` des versions = montant par séjour. */
+  per?: ChargePer;
+  versions: ChargeVersion[];
+};
 
 /** Période où une version s'applique réellement (après résolution des chevauchements). */
 export type ChargeSegment = {

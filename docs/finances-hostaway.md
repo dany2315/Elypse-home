@@ -54,7 +54,7 @@ Lecture de l'écran (demande d'Elypse, 16/11/2026) : **chiffre d'affaires** = to
 | **Frais de paiement** | `f.paymentServiceProcessingFees + f.bookingcomPaymentProcessingFee`, à défaut **1,4 % du `totalPrice` pour Booking** | Les champs Hostaway sont toujours vides ; le taux de 1,4 % est le réglage « Frais de traitement du paiement OTA » du compte Hostaway, absent de l'API (vérifié au centime : 1 162,44 € → 16,27 €). Constante `BOOKING_PAYMENT_FEE_RATE` dans `mapping.ts`. |
 | **Remboursements** | `−(f.airbnbClosedResolutionsSum + f.airbnbOpenResolutionsSum)` (séjours confirmés) | Résolutions Airbnb (remboursements aux voyageurs). Hostaway les retire de `totalPrice` : on les rajoute au CA puis on les déduit du revenu net. Pour une annulation, la résolution est le montant conservé et reste dans le CA. |
 | **Net des plateformes** (champ `payout` ; « Net » par réservation, « Net avant charges » par plateforme) | `CA − commissions − frais de paiement − remboursements − taxe de séjour − TVA` | Ce qui est reçu des plateformes, taxes à reverser retirées. Égal à `f.airbnbPayoutSum` pour 500 séjours Airbnb confirmés sur 537 ; les 37 autres ont un remboursement qu'Airbnb n'a pas encore retenu sur son versement. |
-| − Charges (`charges` = `chargesHT` + `chargesVat`) | charges saisies à la main (voir « Charges fixes par bien ») | Loyer, leasing mobilier, électricité… TVA comprise, comptées au jour près. |
+| − Charges (`charges` = `chargesHT` + `chargesVat`) | charges saisies à la main (voir « Charges fixes par bien » et « Coût du ménage ») | Loyer, leasing mobilier, électricité… TVA comprise, comptées au jour près ; ménage payé par Elypse, compté à chaque séjour. |
 | **Bénéfice** (champ `profit`) | `net des plateformes − charges TTC` | Ce qui reste réellement. |
 | **Taxe de séjour** | `f.cityTax + f.airbnbTransientOccupancyTax + f.transientOccupancyTax + f.guestNightlyTax + f.guestStayTax + f.guestPerPersonPerNightTax` | Airbnb : `f.salesTax` reprend la même taxe que `f.airbnbTransientOccupancyTax` (non additionné). |
 | **TVA** | `f.vat + f.otherTaxes + f.roomTax + f.lodgingTax + f.hotelTax` (+ `f.salesTax` hors Airbnb) | Collectée en plus du CA (Booking, 10 % sur certains listings). |
@@ -198,6 +198,14 @@ Demande : déduire du bénéfice le coût du ménage payé par Elypse. Recherche
 - réservations et détail financier : aucun champ de coût de ménage.
 
 Aucun coût de ménage n'est donc renseigné dans Hostaway à ce jour. Dès qu'il sera saisi comme dépense Hostaway (Dépenses et extras, y compris par règle automatique à chaque départ), il remontera par `/expenses` et pourra être déduit du bénéfice.
+
+### Ménage par séjour (25/11/2026)
+
+Le 25/11/2026, le champ `cleaningFee` des listings Hostaway est rempli sur tous les biens (Le Vaneau 56 €, Le Bosquet / Le Toudic / La Sourdière 74 €, Le Amelot 62 / Le Bartholdi / Le Amelot 157 / 101 rue Nollet / Saint martin 91 €, Le Miromesnil 200 €). Elypse précise que ce sont **les coûts du ménage par réservation**, hors Le Miromesnil (ses 200 € sont le ménage facturé aux voyageurs, à ne pas compter en coût). Ces tarifs ne sont pas facturés aux voyageurs (aucun ménage dans les réservations récentes, hors Miromesnil et 4 séjours de 101 rue Nollet à 75 €).
+
+- **Charge « par séjour »** : colonne `bien_charge.per` (`mois` par défaut, `sejour`), créée par `prisma/sql/2026-11-finances-5.sql` (appliqué sur staging ; à appliquer en production). Le montant de la version est alors un montant **par séjour**. Page Charges : choix « Par mois / Par séjour » à la création (Par séjour proposé pour le type Ménage).
+- **Calcul** (`buildReport`) : une fois par séjour **confirmé** du bien (annulations exclues), au tarif en vigueur le jour d'arrivée, dans la tranche où compte le ménage du voyageur (mois d'arrivée ; mois de réservation en mode « date de réservation »). Ajouté aux charges du bien et à la réservation : le détail d'une réservation affiche « − Ménage (votre coût) » et « = Après ménage ». Carte « Vos charges » : « Ménage (N séjours) ».
+- **Saisie staging (25/11/2026)** : charge « Ménage » par séjour sur les 9 biens (tarif de leur listing Hostaway, TVA 0 %, à partir du 1er janvier 2026), aucune sur Le Miromesnil. Exemple : novembre 2026, 86 séjours, 7 053 € de ménage.
 
 ## Questions ouvertes pour l'équipe
 

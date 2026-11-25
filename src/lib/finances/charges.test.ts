@@ -161,3 +161,68 @@ describe("buildReport — charges et biens exclus", () => {
     assert.equal(alone.total.charges, 80_000);
   });
 });
+
+describe("buildReport — charges par séjour (ménage)", () => {
+  const stay = (o: Partial<ReportReservation> & { id: number; arrival: string; departure: string }): ReportReservation => ({
+    listingId: 1,
+    channel: "airbnbOfficial",
+    status: "new",
+    reservationDate: "2026-09-15",
+    nights: 2,
+    revenueCents: 40_000,
+    commissionCents: 4_000,
+    paymentFeesCents: 0,
+    payoutCents: 36_000,
+    cityTaxCents: 0,
+    cleaningFeeCents: 0,
+    ...o,
+  });
+  const biens = [{ id: "b1", name: "Vaneau", listingIds: [1] }];
+  const menage = {
+    id: "m",
+    bienId: "b1",
+    category: "menage",
+    label: "Ménage",
+    per: "sejour" as const,
+    versions: [
+      v({ id: "m1", start: "2026-01-01", amountCents: 5_600, vatRateBp: 0 }),
+      v({ id: "m2", start: "2026-11-01", amountCents: 6_000, vatRateBp: 0, createdAt: "2026-10-20T10:00:00.000Z" }),
+    ],
+  };
+  const reservations = [
+    stay({ id: 1, arrival: "2026-10-30", departure: "2026-11-02", nights: 3 }), // à cheval : ménage en octobre
+    stay({ id: 2, arrival: "2026-11-05", departure: "2026-11-07" }),
+    stay({ id: 3, arrival: "2026-11-10", departure: "2026-11-12", status: "cancelled", payoutCents: 10_000 }),
+  ];
+  const base = { reservations, biens, charges: [menage], mode: "sejour" as const, cancellations: "toutes" as const };
+
+  it("compte le tarif du jour d'arrivée, une fois par séjour confirmé, au mois d'arrivée", () => {
+    const nov = buildReport({ ...base, period: { year: 2026, month: 11 } });
+    assert.equal(nov.total.charges, 6_000); // séjour 2 seulement (le 1 est arrivé en octobre, le 3 est annulé)
+    assert.deepEqual(nov.charges.map((c) => [c.label, c.ht, c.stays]), [["Ménage", 6_000, 1]]);
+    const oct = buildReport({ ...base, period: { year: 2026, month: 10 } });
+    assert.equal(oct.total.charges, 5_600);
+    const both = buildReport({ ...base, period: { from: "2026-10-01", to: "2026-11-30" } });
+    assert.equal(both.total.charges, 11_600);
+    assert.equal(both.charges[0].stays, 2);
+  });
+
+  it("déduit le ménage du bénéfice de la réservation", () => {
+    const r = buildReport({ ...base, period: { year: 2026, month: 11 } });
+    const line = r.reservations.find((l) => l.id === 2)!;
+    assert.equal(line.totals.charges, 6_000);
+    assert.equal(line.totals.profit, 36_000 - 6_000);
+    assert.equal(r.reservations.find((l) => l.id === 3)!.totals.charges, 0);
+  });
+
+  it("n'est pas réparti au jour comme une charge mensuelle", () => {
+    const r = buildReport({ ...base, reservations: [], period: { year: 2026, month: 11 } });
+    assert.equal(r.total.charges, 0);
+    assert.equal(r.charges.length, 0);
+  });
+
+  it("mode réservation : compté au mois de la réservation", () => {
+    const r = buildReport({ ...base, mode: "reservation", period: { year: 2026, month: 9 } });
+    assert.equal(r.total.charges, 5_600 + 6_000);
+  });
+});

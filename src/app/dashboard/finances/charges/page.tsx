@@ -28,10 +28,10 @@ export default async function ChargesPage() {
         <p className="text-[11px] font-medium tracking-[0.3em] text-gold-deep uppercase">Finances</p>
         <h1 className="mt-2 font-serif text-4xl leading-none text-ink sm:text-5xl">Charges</h1>
         <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
-          Vos charges fixes mensuelles, bien par bien : loyer, leasing du mobilier, électricité… Elles sont déduites du
-          bénéfice dans les rapports, TVA comprise, et comptées au jour près. Quand un montant change, indiquez la date
-          à partir de laquelle il s&apos;applique : les mois précédents gardent l&apos;ancien montant, et chaque saisie
-          reste dans l&apos;historique.
+          Vos charges, bien par bien : loyer, leasing du mobilier, électricité… comptées au jour près, et le ménage,
+          compté à chaque séjour confirmé. Elles sont déduites du bénéfice dans les rapports, TVA comprise. Quand un
+          montant change, indiquez la date à partir de laquelle il s&apos;applique : ce qui précède garde l&apos;ancien
+          montant, et chaque saisie reste dans l&apos;historique.
         </p>
       </div>
 

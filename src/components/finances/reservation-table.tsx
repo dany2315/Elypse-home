@@ -317,6 +317,11 @@ function Detail({ line: l, livretHref }: { line: ReservationLine; livretHref?: s
     ["− Taxe de séjour", eur(t.cityTax)],
     ["− TVA", eur(t.vat)],
     ["= Net (avant vos charges)", eur(t.payout), true],
+    // Ménage payé par vous à chaque séjour (charge « par séjour »).
+    ...(t.charges ? ([
+      ["− Ménage (votre coût)", eur(t.charges)],
+      ["= Après ménage", eur(t.profit), true],
+    ] as [string, string, boolean?][]) : []),
   ];
   return (
     <div className="grid gap-x-10 gap-y-4 md:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">

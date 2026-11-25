@@ -144,7 +144,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
         <Kpi
           label="Vos charges"
           value={`− ${eur(report.total.charges)}`}
-          note={report.charges.length ? "Loyer, leasing, électricité… TVA comprise" : "Aucune charge saisie sur la période"}
+          note={report.charges.length ? "Loyer, leasing, ménage… TVA comprise" : "Aucune charge saisie sur la période"}
           details={report.charges.length ? chargeDetails(report) : undefined}
           footer={
             <Link href="/dashboard/finances/charges" className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gold-deep hover:underline">
@@ -226,7 +226,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           <p className="mb-3 text-sm text-muted-foreground">
             « Net » = ce que chaque réservation rapporte après les plateformes et les taxes.
             {report.total.charges > 0 &&
-              ` Vos charges fixes (${eur(report.total.charges)} sur la période) ne sont pas réparties par réservation : elles sont déduites du bénéfice en haut de page.`}
+              ` Le ménage payé à chaque séjour apparaît dans le détail de la réservation ; vos charges mensuelles (loyer, leasing…) ne sont pas réparties par réservation : elles sont déduites du bénéfice en haut de page.`}
           </p>
           <ReservationTable lines={report.reservations} channelColors={channelColors(report)} livretLinks={livretLinks} />
         </section>
@@ -278,10 +278,17 @@ type Detail = [label: string, value: string];
 
 /** Charges de la période par type (Loyer, Leasing…), puis la TVA comprise. */
 function chargeDetails(report: Report): Detail[] {
-  const byCategory = new Map<string, number>();
-  for (const c of report.charges) byCategory.set(c.category, (byCategory.get(c.category) ?? 0) + c.ht + c.vat);
+  const byCategory = new Map<string, { amount: number; stays: number }>();
+  for (const c of report.charges) {
+    const e = byCategory.get(c.category) ?? { amount: 0, stays: 0 };
+    e.amount += c.ht + c.vat;
+    e.stays += c.stays ?? 0;
+    byCategory.set(c.category, e);
+  }
   return [
-    ...[...byCategory].sort((a, b) => b[1] - a[1]).map(([c, v]): Detail => [chargeCategoryLabel(c), eur(v)]),
+    ...[...byCategory]
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .map(([c, e]): Detail => [e.stays ? `${chargeCategoryLabel(c)} (${int(e.stays)} séjour${e.stays > 1 ? "s" : ""})` : chargeCategoryLabel(c), eur(e.amount)]),
     ["dont TVA", eur(report.total.chargesVat)],
   ];
 }

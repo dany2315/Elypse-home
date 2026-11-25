@@ -33,15 +33,18 @@ import {
   chargeCategoryLabel,
   chargeForMonth,
   chargeSegments,
+  defaultPer,
   htFromTtc,
   nextSegment,
   parseEuros,
+  perLabel,
   segmentAt,
   ttcOf,
   vatOf,
   VAT_RATES,
   vatRateLabel,
   type ChargeCategory,
+  type ChargePer,
   type ChargeSegment,
   type ReportCharge,
 } from "@/lib/finances/charges";
@@ -102,8 +105,8 @@ const savedAt = (iso: string) => `${shortDate(parisDay.format(new Date(iso)))} �
 
 const segmentPeriod = (s: ChargeSegment, today: string) =>
   s.end ? `Du ${longDate(s.start)} au ${longDate(s.end)}` : s.start > today ? `À partir du ${longDate(s.start)}` : `Depuis le ${longDate(s.start)}`;
-const perMonth = (s: { amountCents: number; vatRateBp: number }) =>
-  `${eur(ttcOf(s.amountCents, s.vatRateBp))} TTC / mois · ${eur(s.amountCents)} HT · TVA ${vatRateLabel(s.vatRateBp)}`;
+const perPeriod = (s: { amountCents: number; vatRateBp: number }, per: ChargePer | undefined) =>
+  `${eur(ttcOf(s.amountCents, s.vatRateBp))} TTC / ${perLabel(per)} · ${eur(s.amountCents)} HT · TVA ${vatRateLabel(s.vatRateBp)}`;
 
 export function ChargesManager({ today, biens }: { today: string; biens: BienData[] }) {
   const [pending, startTransition] = useTransition();
@@ -178,7 +181,10 @@ function BienCharges({
   onRename: (charge: ReportCharge) => void;
 }) {
   const month = today.slice(0, 7);
-  const monthTotal = bien.charges.reduce((a, c) => a + chargeForMonth(chargeSegments(c.versions), month).ttc, 0);
+  // Charges mensuelles seulement : le ménage dépend du nombre de séjours.
+  const monthTotal = bien.charges
+    .filter((c) => c.per !== "sejour")
+    .reduce((a, c) => a + chargeForMonth(chargeSegments(c.versions), month).ttc, 0);
   const missing = SUGGESTED.filter((c) => !bien.charges.some((x) => x.category === c));
 
   return (
@@ -193,7 +199,7 @@ function BienCharges({
         <div className="ml-auto flex items-center gap-3">
           {monthTotal > 0 && (
             <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-ink tabular-nums">{eur(monthTotal)}</span> TTC en {monthLabel(month, false)}
+              <span className="font-semibold text-ink tabular-nums">{eur(monthTotal)}</span> TTC / mois en {monthLabel(month, false)}
             </p>
           )}
           <Button variant="outline" size="lg" onClick={() => onAdd(missing[0] ?? "autre")}>
@@ -276,10 +282,11 @@ function ChargeRow({
                 <span className="font-semibold text-ink">{eur(ttcOf(current.amountCents, current.vatRateBp))} TTC</span>
                 <span className="text-muted-foreground">
                   {" "}
-                  / mois · {eur(current.amountCents)} HT · TVA {vatRateLabel(current.vatRateBp)}
+                  / {perLabel(charge.per)} · {eur(current.amountCents)} HT · TVA {vatRateLabel(current.vatRateBp)}
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
+                {charge.per === "sejour" && "à chaque séjour confirmé (tarif du jour d'arrivée) · "}
                 depuis le {longDate(current.start)}
                 {current.end && !next && ` · jusqu'au ${longDate(current.end)}`}
               </p>
@@ -298,7 +305,7 @@ function ChargeRow({
             <p className="mt-1 text-xs font-medium text-gold-deep">
               {next.amountCents === 0
                 ? `Arrêt prévu le ${longDate(next.start)}`
-                : `À partir du ${longDate(next.start)} : ${eur(ttcOf(next.amountCents, next.vatRateBp))} TTC / mois`}
+                : `À partir du ${longDate(next.start)} : ${eur(ttcOf(next.amountCents, next.vatRateBp))} TTC / ${perLabel(charge.per)}`}
             </p>
           )}
         </div>
@@ -383,7 +390,7 @@ function HistoryPanel({
                     {state}
                   </span>
                 </p>
-                <p className="text-xs text-muted-foreground tabular-nums">{s.amountCents ? perMonth(s) : "Charge arrêtée (0 €)"}</p>
+                <p className="text-xs text-muted-foreground tabular-nums">{s.amountCents ? perPeriod(s, charge.per) : "Charge arrêtée (0 €)"}</p>
               </li>
             );
           })}
@@ -456,6 +463,8 @@ function AmountDialog({
   const [category, setCategory] = useState<ChargeCategory>(state.kind === "create" ? state.category : "autre");
   const [label, setLabel] = useState(state.kind === "create" ? chargeCategoryLabel(state.category) : state.charge.label);
   const [labelEdited, setLabelEdited] = useState(false);
+  const [per, setPer] = useState<ChargePer>(state.kind === "create" ? defaultPer(state.category) : (state.charge.per ?? "mois"));
+  const unit = perLabel(per);
   const [stop, setStop] = useState(false);
   const [basis, setBasis] = useState<"ht" | "ttc">("ht");
   const [rate, setRate] = useState(reference?.vatRateBp ?? (state.kind === "create" ? DEFAULT_VAT[state.category] : 2000));
@@ -475,6 +484,7 @@ function AmountDialog({
     setCategory(c);
     if (!labelEdited) setLabel(chargeCategoryLabel(c));
     setRate(DEFAULT_VAT[c]);
+    setPer(defaultPer(c));
   }
 
   function switchBasis(next: "ht" | "ttc") {
@@ -488,7 +498,7 @@ function AmountDialog({
     if (!valid) return;
     const version = { amountCents: stop ? 0 : ht!, vatRateBp: rate, start, end: end || null, note };
     if (state.kind === "create") {
-      run(() => createCharge({ bienId: state.bien.id, category, label, ...version }), `« ${label.trim()} » ajoutée`, onClose);
+      run(() => createCharge({ bienId: state.bien.id, category, label, per, ...version }), `« ${label.trim()} » ajoutée`, onClose);
     } else {
       run(() => addChargeVersion(state.charge.id, version), stop ? "Arrêt enregistré" : "Nouveau montant enregistré", onClose);
     }
@@ -504,7 +514,10 @@ function AmountDialog({
             </DialogTitle>
             <DialogDescription>
               {state.bien.name}
-              {state.kind === "version" && " · le nouveau montant s'applique à partir de la date choisie, les mois précédents ne changent pas."}
+              {state.kind === "version" &&
+                (per === "sejour"
+                  ? " · le nouveau montant s'applique aux séjours arrivés à partir de la date choisie, les précédents ne changent pas."
+                  : " · le nouveau montant s'applique à partir de la date choisie, les mois précédents ne changent pas.")}
             </DialogDescription>
           </DialogHeader>
 
@@ -533,6 +546,36 @@ function AmountDialog({
                     );
                   })}
                 </div>
+              </fieldset>
+              <fieldset>
+                <legend className="text-[10px] font-semibold tracking-[0.2em] text-muted-foreground uppercase">Montant</legend>
+                <div className="mt-2 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Rythme de la charge">
+                  {(
+                    [
+                      { v: "mois", l: "Par mois" },
+                      { v: "sejour", l: "Par séjour" },
+                    ] as const
+                  ).map((o) => (
+                    <button
+                      key={o.v}
+                      type="button"
+                      role="radio"
+                      aria-checked={per === o.v}
+                      onClick={() => setPer(o.v)}
+                      className={cn(
+                        "rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:ring-2 focus-visible:ring-gold/60 focus-visible:outline-none",
+                        per === o.v ? "bg-card text-ink shadow-sm" : "text-muted-foreground hover:text-ink",
+                      )}
+                    >
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  {per === "sejour"
+                    ? "Compté une fois à chaque séjour confirmé du bien (ménage…), au tarif du jour d'arrivée."
+                    : "Montant mensuel, compté au jour près (loyer, électricité…)."}
+                </p>
               </fieldset>
               <Field label="Libellé">
                 <Input
@@ -571,7 +614,7 @@ function AmountDialog({
           {!stop && (
             <div className="grid grid-cols-1 gap-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_9.5rem]">
-                <Field label="Montant par mois">
+                <Field label={`Montant par ${unit}`}>
                   <div className="flex">
                     <Input
                       inputMode="decimal"
@@ -621,12 +664,12 @@ function AmountDialog({
                   text ? (
                     <span className="text-destructive">Montant invalide (ex. : 1 250,50)</span>
                   ) : (
-                    "Saisissez le montant mensuel, hors taxes ou TVA comprise."
+                    `Saisissez le montant par ${unit}, hors taxes ou TVA comprise.`
                   )
                 ) : (
                   <>
                     {eur(ht)} HT + {eur(vatOf(ht, rate))} de TVA = <span className="font-semibold text-ink">{eur(ttcOf(ht, rate))} TTC</span>{" "}
-                    par mois
+                    par {unit}
                   </>
                 )}
               </p>
@@ -647,7 +690,7 @@ function AmountDialog({
               {state.kind === "version" && (
                 <li>
                   Avant le {longDate(start)}, rien ne change
-                  {reference ? ` (${reference.amountCents ? `${eur(ttcOf(reference.amountCents, reference.vatRateBp))} TTC / mois` : "charge arrêtée"})` : ""}.
+                  {reference ? ` (${reference.amountCents ? `${eur(ttcOf(reference.amountCents, reference.vatRateBp))} TTC / ${unit}` : "charge arrêtée"})` : ""}.
                 </li>
               )}
               {end ? (

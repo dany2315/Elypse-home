@@ -11,12 +11,14 @@
  *  - "arrivee"     : tout à la tranche du jour d'arrivée.
  *  - "reservation" : tout à la tranche de la date de réservation.
  * Charges fixes (saisies à la main, voir charges.ts) : réparties au jour dans chaque tranche,
- * quel que soit le mode. Bénéfice = net des plateformes − charges TTC.
+ * quel que soit le mode. Charges par séjour (ménage) : une fois par séjour confirmé, au tarif du
+ * jour d'arrivée, dans la tranche où compte le ménage du voyageur (arrivée, ou date de réservation
+ * en mode « reservation »). Bénéfice = net des plateformes − charges TTC.
  * Montants en centimes. Le prorata est arrondi en cumulé depuis l'arrivée : la somme des
  * tranches (et de périodes adjacentes) redonne exactement le montant de la réservation.
  */
 
-import { chargeInRange, chargeSegments, type ReportCharge } from "./charges";
+import { chargeInRange, chargeSegments, segmentAt, vatOf, type ChargeSegment, type ReportCharge } from "./charges";
 
 export type Mode = "sejour" | "arrivee" | "reservation";
 export type CancelFilter = "versement" | "toutes" | "aucune";
@@ -173,7 +175,17 @@ export type ReservationLine = {
 };
 
 /** Charge comptée dans la période, pour un bien. */
-export type ChargeLine = { id: string; bienKey: string; bienName: string; category: string; label: string; ht: number; vat: number };
+export type ChargeLine = {
+  id: string;
+  bienKey: string;
+  bienName: string;
+  category: string;
+  label: string;
+  ht: number;
+  vat: number;
+  /** Charge par séjour : nombre de séjours comptés (absent pour une charge mensuelle). */
+  stays?: number;
+};
 
 export type Report = {
   buckets: Bucket[];
@@ -448,6 +460,17 @@ export function buildReport(input: ReportInput): Report {
   let cancelledExcluded = 0;
   const lines: ReservationLine[] = [];
 
+  // Charges par séjour des biens comptés, par bien.
+  const perStay = new Map<string, { segments: ChargeSegment[]; line: ChargeLine }[]>();
+  for (const c of input.charges ?? []) {
+    if (c.per !== "sejour" || skipGroup(c.bienId) || !groupNames.has(c.bienId)) continue;
+    const entry = {
+      segments: chargeSegments(c.versions),
+      line: { id: c.id, bienKey: c.bienId, bienName: groupNames.get(c.bienId)!, category: c.category, label: c.label, ht: 0, vat: 0, stays: 0 },
+    };
+    perStay.set(c.bienId, [...(perStay.get(c.bienId) ?? []), entry]);
+  }
+
   for (const r of kept) {
     const group = groupOf(r.listingId);
     if (skipGroup(group)) continue;
@@ -476,6 +499,26 @@ export function buildReport(input: ReportInput): Report {
       for (const k of [`${group}|${s.bucket}`, `${group}|*`, `*|${s.bucket}`, "*|*", `ch:${r.channel}`]) acc(k).add(s, r.id);
       line.add(s, r.id);
     }
+
+    // Charges par séjour (ménage) : séjours confirmés seulement, tarif du jour d'arrivée.
+    const costBucket = CONFIRMED.has(r.status)
+      ? bucketOf(buckets, input.mode === "reservation" ? (r.reservationDate ?? r.arrival) : r.arrival)?.key
+      : undefined;
+    for (const c of costBucket ? (perStay.get(group) ?? []) : []) {
+      const seg = segmentAt(c.segments, r.arrival);
+      if (!seg?.amountCents) continue;
+      const ht = seg.amountCents;
+      const vat = vatOf(ht, seg.vatRateBp);
+      for (const k of [`${group}|${costBucket}`, `${group}|*`, `*|${costBucket}`, "*|*"]) {
+        acc(k).chargesHT += ht;
+        acc(k).chargesVat += vat;
+      }
+      line.chargesHT += ht;
+      line.chargesVat += vat;
+      c.line.ht += ht;
+      c.line.vat += vat;
+      c.line.stays = (c.line.stays ?? 0) + 1;
+    }
     const totals = line.totals(0);
     lines.push({
       id: r.id,
@@ -495,9 +538,9 @@ export function buildReport(input: ReportInput): Report {
   }
 
   // Charges fixes : réparties au jour dans chaque tranche.
-  const chargeLines: ChargeLine[] = [];
+  const chargeLines: ChargeLine[] = [...perStay.values()].flat().map((c) => c.line).filter((l) => l.stays);
   for (const c of input.charges ?? []) {
-    if (skipGroup(c.bienId) || !groupNames.has(c.bienId)) continue;
+    if (c.per === "sejour" || skipGroup(c.bienId) || !groupNames.has(c.bienId)) continue;
     const segments = chargeSegments(c.versions);
     const line = { ht: 0, vat: 0 };
     for (const b of buckets) {

@@ -277,6 +277,8 @@ model BienCharge {
   /// loyer | leasing | electricite | internet | assurance | copropriete | menage | autre
   category  String              @default("autre")
   label     String
+  /// mois (montant mensuel, réparti au jour) | sejour (montant par séjour confirmé : ménage)
+  per       String              @default("mois")
   sortOrder Int                 @default(0)
   versions  BienChargeVersion[]
   createdAt DateTime            @default(now())
@@ -296,7 +298,7 @@ model BienChargeVersion {
   startDate   DateTime   @db.Date
   /// Dernier jour concerné (inclus) ; null = sans fin.
   endDate     DateTime?  @db.Date
-  /// Montant mensuel hors taxes, en centimes (0 = charge arrêtée).
+  /// Montant hors taxes, en centimes, par mois ou par séjour selon la charge (0 = charge arrêtée).
   amountCents Int
   /// Taux de TVA en points de base (2000 = 20 %).
   vatRateBp   Int        @default(0)

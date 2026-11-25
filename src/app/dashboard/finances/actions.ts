@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isChargeCategory, VAT_RATES } from "@/lib/finances/charges";
+import { isChargeCategory, isChargePer, type ChargePer, VAT_RATES } from "@/lib/finances/charges";
 import { validDate } from "@/lib/finances/filters";
 import { syncHostaway } from "@/lib/finances/sync";
 
@@ -169,16 +169,19 @@ const label = z.string().trim().min(1, "Le libellé est obligatoire").max(80);
 
 export type ChargeVersionInput = z.input<typeof versionInput>;
 
-/** Nouvelle charge d'un bien, avec son premier montant. */
-export async function createCharge(input: { bienId: string; category: string; label: string } & ChargeVersionInput): Promise<Result> {
+/** Nouvelle charge d'un bien, avec son premier montant (par mois, ou par séjour pour le ménage). */
+export async function createCharge(
+  input: { bienId: string; category: string; label: string; per?: ChargePer } & ChargeVersionInput,
+): Promise<Result> {
   await requireSession();
   try {
     const bienId = id.parse(input.bienId);
     const category = z.string().refine(isChargeCategory, "Type de charge invalide").parse(input.category);
+    const per = z.string().refine(isChargePer, "Rythme invalide").parse(input.per ?? "mois");
     const version = versionInput.parse(input);
     const max = (await prisma.bienCharge.aggregate({ where: { bienId }, _max: { sortOrder: true } }))._max.sortOrder ?? 0;
     await prisma.bienCharge.create({
-      data: { bienId, category, label: label.parse(input.label), sortOrder: max + 1, versions: { create: versionData(version) } },
+      data: { bienId, category, label: label.parse(input.label), per, sortOrder: max + 1, versions: { create: versionData(version) } },
     });
     refresh();
     return { ok: true };

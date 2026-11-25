@@ -1,7 +1,7 @@
 /** Chargement des données Finances depuis la base (côté serveur, aucun appel Hostaway). */
 import { prisma } from "@/lib/db";
 import { toPeriod, type FinanceFilters } from "./filters";
-import type { ReportCharge } from "./charges";
+import { isChargePer, type ReportCharge } from "./charges";
 import { nextMonth, type CalendarData, type CalendarStay } from "./calendar";
 import { buildReport, periodRange, type Report, type ReportBien } from "./report";
 
@@ -49,6 +49,7 @@ export async function loadCharges(): Promise<ReportCharge[]> {
     bienId: c.bienId,
     category: c.category,
     label: c.label,
+    per: isChargePer(c.per) ? c.per : "mois",
     versions: c.versions.map((v) => ({
       id: v.id,
       start: iso(v.startDate),
