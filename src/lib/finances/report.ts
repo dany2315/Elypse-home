@@ -124,11 +124,16 @@ export type Totals = {
   cityTax: number;
   /** TVA et autres taxes. */
   vat: number;
+  /** Ménage payé par les voyageurs (compris dans le chiffre d'affaires). */
   cleaning: number;
-  /** Charges fixes saisies (loyer, leasing, électricité…) : hors taxes, TVA, TTC. */
+  /** Charges saisies (loyer, leasing, électricité, ménage…) : hors taxes, TVA, TTC. */
   chargesHT: number;
   chargesVat: number;
   charges: number;
+  /** Dont charges par séjour (ménage payé par vous), TTC. */
+  cleaningCost: number;
+  /** Dont charges mensuelles (loyer, leasing…), TTC : charges − cleaningCost. */
+  otherCharges: number;
   /** Bénéfice : ce qui reste réellement = net des plateformes − charges TTC. */
   profit: number;
   stays: number;
@@ -350,6 +355,7 @@ class Acc {
   cleaning = 0;
   chargesHT = 0;
   chargesVat = 0;
+  stayCharges = 0;
   nights = 0;
   occupiedNights = 0;
   ids = new Set<number>();
@@ -383,6 +389,8 @@ class Acc {
       chargesHT: this.chargesHT,
       chargesVat: this.chargesVat,
       charges,
+      cleaningCost: this.stayCharges,
+      otherCharges: charges - this.stayCharges,
       profit: payout - charges,
       stays: this.ids.size,
       nights: this.nights,
@@ -512,9 +520,11 @@ export function buildReport(input: ReportInput): Report {
       for (const k of [`${group}|${costBucket}`, `${group}|*`, `*|${costBucket}`, "*|*"]) {
         acc(k).chargesHT += ht;
         acc(k).chargesVat += vat;
+        acc(k).stayCharges += ht + vat;
       }
       line.chargesHT += ht;
       line.chargesVat += vat;
+      line.stayCharges += ht + vat;
       c.line.ht += ht;
       c.line.vat += vat;
       c.line.stays = (c.line.stays ?? 0) + 1;

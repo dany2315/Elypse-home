@@ -310,7 +310,7 @@ function Detail({ line: l, livretHref }: { line: ReservationLine; livretHref?: s
   const t = l.totals;
   const rows: [string, string, boolean?][] = [
     ["Chiffre d'affaires", eur(t.gross), true],
-    ["dont frais de ménage", eur(t.cleaning)],
+    ["dont ménage payé par le voyageur", eur(t.cleaning)],
     ["− Commissions de la plateforme", eur(t.commission)],
     ["− Frais de paiement", eur(t.paymentFees)],
     ["− Remboursements", eur(t.refunds)],

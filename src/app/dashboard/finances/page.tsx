@@ -118,7 +118,7 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
           value={eur(report.total.gross)}
           note="Tout ce que les voyageurs ont payé"
           details={[
-            ["dont frais de ménage", eur(report.total.cleaning)],
+            ["dont ménage payé par les voyageurs", eur(report.total.cleaning)],
             ["dont taxes (séjour, TVA)", eur(report.total.cityTax + report.total.vat)],
           ]}
         />
@@ -256,9 +256,10 @@ export default async function FinancesPage(props: PageProps<"/dashboard/finances
       <p className="mt-8 max-w-3xl text-xs leading-relaxed text-muted-foreground">
         Chiffre d&apos;affaires : tout ce que les voyageurs ont payé (nuitées, ménage, frais de service, taxe de séjour,
         TVA), comme les « Revenus de location » Hostaway. Net des plateformes = chiffre d&apos;affaires − commissions −
-        frais de paiement − remboursements − taxe de séjour − TVA. Bénéfice = net des plateformes − vos charges (saisies
-        dans « Charges », TVA comprise, comptées au jour près : du 1er au 15 d&apos;un mois de 30 jours, la moitié du
-        loyer). Les frais de ménage sont payés par les voyageurs et restent dans le bénéfice. Occupation : nuits
+        frais de paiement − remboursements − taxe de séjour − TVA. Bénéfice = net des plateformes − ménage − vos charges
+        (saisis dans « Charges », TVA comprise). Ménage (coût) : ce que vous payez, compté à chaque séjour au mois
+        d&apos;arrivée. Charges mensuelles comptées au jour près : du 1er au 15 d&apos;un mois de 30 jours, la moitié du
+        loyer. Le ménage payé par les voyageurs, lui, est compris dans le chiffre d&apos;affaires. Occupation : nuits
         occupées / nuits du calendrier (nuits bloquées non déduites).
       </p>
     </main>

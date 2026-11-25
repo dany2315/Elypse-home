@@ -131,6 +131,8 @@ describe("buildReport — charges et biens exclus", () => {
     assert.equal(b1.chargesHT, 105_000);
     assert.equal(b1.chargesVat, 1_000);
     assert.equal(b1.charges, 106_000);
+    assert.equal(b1.cleaningCost, 0);
+    assert.equal(b1.otherCharges, 106_000);
     assert.equal(b1.payout, 45_000);
     assert.equal(b1.profit, 45_000 - 106_000);
     assert.equal(r.total.charges, 106_000 + 80_000);
@@ -212,6 +214,8 @@ describe("buildReport — charges par séjour (ménage)", () => {
     const line = r.reservations.find((l) => l.id === 2)!;
     assert.equal(line.totals.charges, 6_000);
     assert.equal(line.totals.profit, 36_000 - 6_000);
+    assert.equal(line.totals.cleaningCost, 6_000);
+    assert.equal(line.totals.otherCharges, 0);
     assert.equal(r.reservations.find((l) => l.id === 3)!.totals.charges, 0);
   });
 

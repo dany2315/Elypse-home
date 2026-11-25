@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     "Nuits",
     "Occupation (%)",
     "Chiffre d'affaires (€)",
-    "dont ménage (€)",
+    "dont ménage payé par les voyageurs (€)",
     "Commissions (€)",
     "Frais de paiement (€)",
     "Remboursements (€)",
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
     "Charges HT (€)",
     "TVA sur charges (€)",
     "Charges TTC (€)",
+    "dont ménage, votre coût (€)",
     "Bénéfice (€)",
   ];
   const line = (label: string, t: Totals) => [
@@ -45,6 +46,7 @@ export async function GET(request: Request) {
     csvAmount(t.chargesHT),
     csvAmount(t.chargesVat),
     csvAmount(t.charges),
+    csvAmount(t.cleaningCost),
     csvAmount(t.profit),
   ];
   const section = (s: ViewSection) => [
@@ -69,13 +71,14 @@ export async function GET(request: Request) {
       "Nuits comptées",
       "Nuits du séjour",
       "Chiffre d'affaires (€)",
-      "dont ménage (€)",
+      "dont ménage payé par le voyageur (€)",
       "Commissions (€)",
       "Frais de paiement (€)",
       "Remboursements (€)",
       "Taxe de séjour (€)",
       "TVA (€)",
       "Net avant charges (€)",
+      "Ménage, votre coût (€)",
     ],
     ...lines.map((l) => [
       l.arrival,
@@ -96,6 +99,7 @@ export async function GET(request: Request) {
       csvAmount(l.totals.cityTax),
       csvAmount(l.totals.vat),
       csvAmount(l.totals.payout),
+      csvAmount(l.totals.cleaningCost),
     ]),
     [],
   ];

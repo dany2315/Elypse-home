@@ -14,7 +14,6 @@ type Column = { key: keyof Totals; label: string; hint?: string; strong?: boolea
  */
 const PLATFORM_COLUMNS: Column[] = [
   { key: "gross", label: "Chiffre d'affaires", hint: "Tout ce que les voyageurs ont payé : nuitées, ménage, frais de service, taxes (Revenus de location Hostaway)", strong: true },
-  { key: "cleaning", label: "dont ménage", hint: "Frais de ménage payés par les voyageurs (compris dans le chiffre d'affaires, restent dans le bénéfice)" },
   { key: "commission", label: "Commissions", hint: "Frais d'hôte et frais de service voyageur prélevés par la plateforme", minus: true },
   { key: "paymentFees", label: "Frais de paiement", hint: "Frais de traitement du paiement (Booking : 1,4 %)", minus: true },
   { key: "refunds", label: "Remboursements", hint: "Sommes rendues aux voyageurs (résolutions Airbnb)", minus: true },
@@ -23,11 +22,12 @@ const PLATFORM_COLUMNS: Column[] = [
 ];
 const WITH_CHARGES: Column[] = [
   ...PLATFORM_COLUMNS,
-  { key: "charges", label: "Charges", hint: "Vos charges fixes saisies (loyer, leasing mobilier, électricité…), TVA comprise", minus: true },
+  { key: "cleaningCost", label: "Ménage (coût)", hint: "Ménage payé par vous, compté à chaque séjour (page Charges), TVA comprise", minus: true },
+  { key: "otherCharges", label: "Charges", hint: "Vos charges mensuelles saisies (loyer, leasing mobilier, électricité…), TVA comprise", minus: true },
   {
     key: "profit",
     label: "Bénéfice",
-    hint: "Ce qui reste réellement : chiffre d'affaires − commissions − frais de paiement − remboursements − taxes − charges",
+    hint: "Ce qui reste réellement : chiffre d'affaires − commissions − frais de paiement − remboursements − taxes − ménage − charges",
     strong: true,
   },
 ];
